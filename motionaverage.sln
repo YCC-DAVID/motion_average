@@ -40,20 +40,41 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "porgraphwithprior_ceres_sol
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bundlegraph_ceres_solver_legacy", "prototype\bundlegraph_ceres_solver\bundlegraph_ceres_solver.vcxproj", "{2D13B351-8F2E-483D-87D6-E83C23310A58}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A80F870B-8DB5-481D-8378-B23C048D3BD2} = {A80F870B-8DB5-481D-8378-B23C048D3BD2}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "geometricaware_posegraph_ceres_solver_legacy", "prototype\geometricaware_posegraph_ceres_solver\geometricaware_posegraph_ceres_solver.vcxproj", "{00378BB4-05FB-4F64-9FFF-C70B604C22D2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A80F870B-8DB5-481D-8378-B23C048D3BD2} = {A80F870B-8DB5-481D-8378-B23C048D3BD2}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cast_graph_legacy", "prototype\cast_graph\cast_graph.vcxproj", "{C9BA27CF-F89E-439F-BC11-2FEA7B779F64}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A80F870B-8DB5-481D-8378-B23C048D3BD2} = {A80F870B-8DB5-481D-8378-B23C048D3BD2}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "apply_graph_legacy", "prototype\apply_graph\apply_graph.vcxproj", "{04856495-C296-4BA9-9524-7662B50465CE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A80F870B-8DB5-481D-8378-B23C048D3BD2} = {A80F870B-8DB5-481D-8378-B23C048D3BD2}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "apply_graph_resample_legacy", "prototype\apply_graph_resample\apply_graph_resample.vcxproj", "{ED1B3606-3D7F-49D9-B141-5830DFA1947A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A80F870B-8DB5-481D-8378-B23C048D3BD2} = {A80F870B-8DB5-481D-8378-B23C048D3BD2}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "create_graph", "apps\create_graph\create_graph.vcxproj", "{FE100163-22C6-46A9-BAB0-3CF530A87173}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6B3CCAD0-AEDF-455D-A01F-6F2BD6965FA2} = {6B3CCAD0-AEDF-455D-A01F-6F2BD6965FA2}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{BB7DBE47-CE58-431A-94FF-29F4A7126305}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_libmotionavg", "test\test_libmotionavg\test_libmotionavg.vcxproj", "{34FD799D-7CC7-42AD-A573-FBF238F6960B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6B3CCAD0-AEDF-455D-A01F-6F2BD6965FA2} = {6B3CCAD0-AEDF-455D-A01F-6F2BD6965FA2}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "libs", "libs", "{5819610A-096D-4653-90BC-EE810B4E568E}"
 EndProject
