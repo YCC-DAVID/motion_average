@@ -4,6 +4,7 @@ eigen/3.4.0
 ceres-solver/2.0.0
 cxxopts/3.0.0
 spdlog/1.9.2
+doctest/2.4.8
 
 [generators]
 visual_studio
