@@ -5,8 +5,10 @@
 #include <cassert>
 #include <fstream>
 
-using namespace motionavg;
+namespace fs = std::filesystem;
+namespace logg = spdlog;
 using namespace std;
+using namespace motionavg;
 
 
 

@@ -152,17 +152,17 @@ namespace motionavg {
 
 std::ostream& operator<<(std::ostream& ofs, const motionavg::AffineModel& m);
 
+std::ostream& operator<<(std::ostream& ofs, const motionavg::XfmGraph& g);
 std::ostream& operator<<(std::ostream& ofs, const motionavg::XfmGraph::Node& n);
+std::istream& operator>>(std::istream& ifs, motionavg::XfmGraph& g);
 std::istream& operator>>(std::istream& ifs, motionavg::XfmGraph::Node& n);
 
 std::ostream& operator<<(std::ostream& ofs, const motionavg::PoseGraph& g);
 std::ostream& operator<<(std::ostream& ofs, const motionavg::PoseGraph::Edge& e);
-
 std::istream& operator>>(std::istream& ifs, motionavg::PoseGraph& g);
 std::istream& operator>>(std::istream& ifs, motionavg::PoseGraph::Edge& e);
 
 std::ostream& operator<<(std::ostream& ofs, const motionavg::BundleGraph& g);
 std::ostream& operator<<(std::ostream& ofs, const motionavg::BundleGraph::Edge& e);
-
 std::istream& operator>>(std::istream& ifs, motionavg::BundleGraph& g);
 std::istream& operator>>(std::istream& ifs, motionavg::BundleGraph::Edge& e);

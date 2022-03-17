@@ -140,7 +140,7 @@ bool MotionAverage_T::IterSolver_Run()
 		{
 
 			_Compute_Error_Between_Iterations(_Node_Para_list[p],Node_Para_list_last_iter[p],p,TemThisError);
-			CumError += TemThisError;
+			CumError += pow(TemThisError,2);
 		}
 
 		CumError /= (double)_Node_Para_list.size();

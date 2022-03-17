@@ -194,6 +194,38 @@ std::ostream& operator<<(std::ostream& ofs, const motionavg::XfmGraph::Node& n)
 	return ofs;
 }
 
+std::ostream& operator<<(std::ostream& ofs, const motionavg::XfmGraph& g) {
+	ofs << std::fixed << std::setprecision(15);
+	ofs << "XfmGraph\n";
+	ofs << g.basepath << '\n';
+	ofs << g.baseID << '\n';
+	for (int i = 0; i < 6; ++i)
+	{
+		if (i > 0) ofs << ' ';
+		ofs << g.baseGeo[i];
+	}
+	return ofs;
+}
+
+
+std::istream& operator>>(std::istream& ifs, motionavg::XfmGraph& g) {
+	ifs.unsetf(std::ios_base::skipws);
+	char dummy;
+	string format_identifier;
+	ifs >> format_identifier >> dummy;
+
+	ifs >> g.basepath >> dummy;
+	ifs >> g.baseID >> dummy;
+	for (int i = 0; i < 6; ++i)
+		ifs >> g.baseGeo[i] >> dummy;
+	size_t num_nodes;
+	ifs >> num_nodes >> dummy;
+	g.nodes.resize(num_nodes);
+	for (int i = 0; i < num_nodes; ++i)
+		ifs >> g.nodes[i];
+	return ifs;
+}
+
 // -----------------------------------------
 
 std::ostream& operator<<(std::ostream& ofs, const motionavg::PoseGraph& g) {
