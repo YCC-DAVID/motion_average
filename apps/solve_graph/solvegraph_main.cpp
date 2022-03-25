@@ -69,7 +69,7 @@ PoseGraph solve_posegraph_MoAve_Affine_Iter(const PoseGraph& g)
 	MoAve_Affine MA;
 	MA.Initialize(NodePara, 6, Con_Graph);
 	MA.Set_Reference_Nodes(RefNode);
-	MA.Set_Max_Iter_Num(2);
+	MA.Set_Max_Iter_Num(50);
 	MA.IterSolver_Run();
 	//MA.DirectSolver_Run();
 	// Write out
@@ -82,11 +82,10 @@ PoseGraph solve_posegraph_MoAve_Affine_Iter(const PoseGraph& g)
 	return og;
 }
 
-
 int main(int argc, char** argv)
 {
 	string ingraph = "N:\\motion_avg_whole\\graph.txt";
-	string outgraph = "N:\\motion_avg_whole\\graph_out.txt";
+	string outgraph = "N:\\motion_avg_whole\\graph_analytic.txt";
 	ifstream ifs(ingraph);
 	string typeline;
 	getline(ifs, typeline);

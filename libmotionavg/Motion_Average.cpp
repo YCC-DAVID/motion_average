@@ -94,6 +94,18 @@ bool MotionAverage_T::Initialize(std::vector<std::vector<double>> Node_Para_list
 	return true;
 }
 
+#include <fstream>
+#include <string>
+using namespace std;
+void write_nodes(std::string filepath, const std::vector<std::vector<double>>& nodes)
+{
+	std::ofstream ofs(filepath, std::ios::trunc | std::ios::binary);
+	size_t num = nodes.size();
+	ofs.write(reinterpret_cast<const char*>(&num), sizeof(size_t));
+	for (size_t i = 0; i < num; ++i)
+		ofs.write(reinterpret_cast<const char*>(nodes[i].data()), sizeof(double) * nodes[i].size());
+	ofs.close();
+}
 
 
 /**************************************************************************************************************************************************
@@ -108,7 +120,7 @@ Note: this version is not parallelized. A parallel version will be numerically s
 ****************************************************************************************************************************************************/
 bool MotionAverage_T::IterSolver_Run()
 {
-	double relax_factor = 1;                 // this is the relaxation factor for the datum
+	double relax_factor = 1000;                 // this is the relaxation factor for the datum
 	int IterCount = 0;                       // iterator for solver.
 	double ThisError = std::numeric_limits<double>::max();   // current error between two lines
 	double CumError_last_iter = std::numeric_limits<double>::max();
@@ -126,11 +138,14 @@ bool MotionAverage_T::IterSolver_Run()
 	{
 		for (int p = 0; p < _Node_Para_list.size();p ++)
 		{
-
+			if (std::find(_RefNode_List.begin(), _RefNode_List.end(), p) != _RefNode_List.end()) continue;
 			_LocalSolver(p);                             // for each node, this overloading function updates _Node_Para_list_buf
 			_Node_Para_list[p].assign(_Node_Para_list_buf[p].begin(),_Node_Para_list_buf[p].end()); 
 
 		} //
+
+		write_nodes("N:\\dump_graph\\iter" + to_string(IterCount) + ".bin", _Node_Para_list);
+
 
 		// check the convergence, update the relaxation factor.
 		double CumError = 0;
@@ -150,7 +165,7 @@ bool MotionAverage_T::IterSolver_Run()
 
 		// here update the relaxation factor.
 
-		if (CumError > CumError_last_iter)
+		if (CumError >= CumError_last_iter)
 		{
 			// enhance the tie from the reference.
 			_Relax_Factor *= 2;

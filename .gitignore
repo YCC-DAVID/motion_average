@@ -363,3 +363,6 @@ MigrationBackup/
 FodyWeavers.xsd
 
 3rd/
+.idea/
+.vs/
+.vscode/
