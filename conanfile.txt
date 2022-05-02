@@ -5,6 +5,7 @@ ceres-solver/2.0.0
 cxxopts/3.0.0
 spdlog/1.9.2
 doctest/2.4.8
+pdal/2.3.0
 
 [generators]
 visual_studio

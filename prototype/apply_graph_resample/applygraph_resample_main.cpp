@@ -11,7 +11,7 @@
 
 using namespace std;
 namespace fs = std::filesystem;
-using namespace motionavg;
+using namespace motionavg::Affine2D;
 
 bool ensureDir(fs::path p)
 {

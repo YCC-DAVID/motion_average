@@ -4,11 +4,12 @@
 #include <iomanip>
 #include <cassert>
 #include <fstream>
+#include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
 namespace logg = spdlog;
 using namespace std;
-using namespace motionavg;
+using namespace motionavg::Affine2D;
 
 
 

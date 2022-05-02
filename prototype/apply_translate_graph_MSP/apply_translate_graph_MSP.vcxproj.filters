@@ -15,34 +15,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="myutils.cpp">
+    <ClCompile Include="apply_translate_msp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mystructs.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Mathapi.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="myutils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tem_codes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mystructs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Mathapi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="qin_io.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="extract_tfw.py" />
   </ItemGroup>
 </Project>

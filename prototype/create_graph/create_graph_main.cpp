@@ -16,7 +16,7 @@
 
 using namespace std;
 namespace fs = std::filesystem;
-using namespace motionavg;
+using namespace motionavg::Affine2D;
 
 int main(int argc, char** argv)
 {
@@ -125,8 +125,8 @@ int main(int argc, char** argv)
 		double originSourceGeo[6], resampleSourceGeo[6], composeSourceGeo[6];
 		std::copy_n(pgraph.nodes[source_nid].poseXfm, 6, originSourceGeo);
 		std::copy_n(originSourceGeo, 6, resampleSourceGeo);
-		motionavg::XfmApply(affinemodel.geoParam, originSourceGeo[0] - affinemodel.pixelParam[0], originSourceGeo[3] + affinemodel.pixelParam[3], resampleSourceGeo[0], resampleSourceGeo[3]);
-		motionavg::XfmComposite(resampleSourceGeo, affinemodel.pixelParam, composeSourceGeo);	// This is the final affine transformation from pixel location to registered UTM
+		XfmApply(affinemodel.geoParam, originSourceGeo[0] - affinemodel.pixelParam[0], originSourceGeo[3] + affinemodel.pixelParam[3], resampleSourceGeo[0], resampleSourceGeo[3]);
+		XfmComposite(resampleSourceGeo, affinemodel.pixelParam, composeSourceGeo);	// This is the final affine transformation from pixel location to registered UTM
 
 		double invTargetGeo[6];
 		double invTargetSourceGeo[6];

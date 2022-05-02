@@ -8,7 +8,7 @@
 #include "mystructs.h"
 
 using namespace std;
-using namespace motionavg;
+using namespace motionavg::Affine2D;
 
 int main(int argc, char** argv)
 {

@@ -1,9 +1,6 @@
 #pragma once;
 #include "Motion_Average.h"
 
-
-
-
 /*******************************************************************************************
 two dimentional affine transformation
 A1X1 - A2X2 = 0; ->
@@ -16,18 +13,13 @@ A2 refers to otherID
 
 ********************************************************************************************/
 
+class MoAve_Affine : public MotionAverage_T {
+ public:
+  MoAve_Affine();
+  ~MoAve_Affine();
 
-class MoAve_Affine : public MotionAverage_T
-{
+  bool DirectSolver_Run();
 
-public:
-
-	MoAve_Affine();
-	~MoAve_Affine(); 
-
-	bool DirectSolver_Run();
-
-private:
-	bool _LocalSolver(int index_i);
-
+ private:
+  bool _LocalSolver(int index_i);
 };

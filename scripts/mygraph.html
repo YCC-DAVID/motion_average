@@ -1,0 +1,124 @@
+<html>
+<head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.css" type="text/css" />
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis-network.min.js"> </script>
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+
+<style type="text/css">
+
+        #mynetwork {
+            width: 500px;
+            height: 500px;
+            background-color: #ffffff;
+            border: 1px solid lightgray;
+            position: relative;
+            float: left;
+        }
+
+        
+
+        
+        #config {
+            float: left;
+            width: 400px;
+            height: 600px;
+        }
+        
+
+        
+</style>
+
+</head>
+
+<body>
+<div id = "mynetwork"></div>
+
+
+<div id = "config"></div>
+
+<script type="text/javascript">
+
+    // initialize global variables.
+    var edges;
+    var nodes;
+    var network; 
+    var container;
+    var options, data;
+
+    
+    // This method is responsible for drawing the graph, returns the drawn network
+    function drawGraph() {
+        var container = document.getElementById('mynetwork');
+        
+        
+
+        // parsing and collecting nodes and edges from the python
+        nodes = new vis.DataSet([{"color": "blue", "id": 0, "label": "027_05653_Nadir", "shape": "dot", "value": 1, "x": 0.0, "y": 0.0}, {"color": "blue", "id": 1, "label": "024_05303_Right", "shape": "dot", "value": 1, "x": -169.10018440696876, "y": 699.7867570398375}, {"color": "blue", "id": 2, "label": "024_05401_Right", "shape": "dot", "value": 1, "x": -244.17501812800765, "y": 632.3104232102633}, {"color": "blue", "id": 3, "label": "024_05559_Right", "shape": "dot", "value": 1, "x": -318.89957984897774, "y": 565.2422668095678}, {"color": "blue", "id": 4, "label": "024_05656_Right", "shape": "dot", "value": 1, "x": -394.0602487489814, "y": 498.02516958955675}, {"color": "blue", "id": 5, "label": "024_05754_Right", "shape": "dot", "value": 1, "x": -469.51003372098785, "y": 430.570363339968}, {"color": "blue", "id": 6, "label": "024_05852_Right", "shape": "dot", "value": 1, "x": -544.5911141739925, "y": 362.7919586794451}, {"color": "blue", "id": 7, "label": "024_05950_Right", "shape": "dot", "value": 1, "x": -618.9800959619461, "y": 294.46717709023505}, {"color": "blue", "id": 8, "label": "025_05524_Right", "shape": "dot", "value": 1, "x": -158.80210546392482, "y": 424.67053658980876}, {"color": "blue", "id": 9, "label": "025_05524_Nadir", "shape": "dot", "value": 1, "x": -159.1421616829466, "y": 424.82432292960584}, {"color": "blue", "id": 10, "label": "025_05622_Right", "shape": "dot", "value": 1, "x": -232.94084461103193, "y": 356.7031424995512}, {"color": "blue", "id": 11, "label": "025_05622_Nadir", "shape": "dot", "value": 1, "x": -233.2084683480207, "y": 356.9200056903064}, {"color": "blue", "id": 12, "label": "025_05720_Right", "shape": "dot", "value": 1, "x": -306.50177316193003, "y": 289.2761682998389}, {"color": "blue", "id": 13, "label": "025_05720_Nadir", "shape": "dot", "value": 1, "x": -306.7338427969953, "y": 289.518115430139}, {"color": "blue", "id": 14, "label": "025_05818_Nadir", "shape": "dot", "value": 1, "x": -381.6972648600349, "y": 220.5695464098826}, {"color": "blue", "id": 15, "label": "025_065_Forward", "shape": "dot", "value": 1, "x": -902.9005433269776, "y": -249.3570333905518}, {"color": "blue", "id": 16, "label": "026_050_Forward", "shape": "dot", "value": 1, "x": 363.68440860603005, "y": 598.5219775503501}, {"color": "blue", "id": 17, "label": "026_051_Forward", "shape": "dot", "value": 1, "x": 289.202753192978, "y": 531.1405530702323}, {"color": "blue", "id": 18, "label": "026_05330_Nadir", "shape": "dot", "value": 1, "x": 142.01445642102044, "y": 398.32444940973073}, {"color": "blue", "id": 19, "label": "026_05432_Nadir", "shape": "dot", "value": 1, "x": 68.48743391199969, "y": 331.7510534999892}, {"color": "blue", "id": 20, "label": "026_05534_Nadir", "shape": "dot", "value": 1, "x": -4.962341427919455, "y": 265.1569144995883}, {"color": "blue", "id": 21, "label": "026_05637_Nadir", "shape": "dot", "value": 1, "x": -78.83165326202288, "y": 198.2717239195481}, {"color": "blue", "id": 22, "label": "026_05739_Nadir", "shape": "dot", "value": 1, "x": -153.11335695895832, "y": 131.57308775000274}, {"color": "blue", "id": 23, "label": "026_05841_Nadir", "shape": "dot", "value": 1, "x": -228.70971332292538, "y": 64.65664125978947}, {"color": "blue", "id": 24, "label": "026_05944_Nadir", "shape": "dot", "value": 1, "x": -303.8835840439424, "y": -1.3545118300244212}, {"color": "blue", "id": 25, "label": "026_06046_Nadir", "shape": "dot", "value": 1, "x": -379.6437384500168, "y": -67.39091407041997}, {"color": "blue", "id": 26, "label": "026_062Backward", "shape": "dot", "value": 1, "x": -529.729277329985, "y": -198.08739332016557}, {"color": "blue", "id": 27, "label": "026_063Backward", "shape": "dot", "value": 1, "x": -603.867499004933, "y": -263.09533694013953}, {"color": "blue", "id": 28, "label": "026_064Backward", "shape": "dot", "value": 1, "x": -679.7867536169942, "y": -329.06260087992996}, {"color": "blue", "id": 29, "label": "026_065Backward", "shape": "dot", "value": 1, "x": -754.4073181889253, "y": -393.2721229400486}, {"color": "blue", "id": 30, "label": "027_050Backward", "shape": "dot", "value": 1, "x": 447.0831997030182, "y": 390.8073779903352}, {"color": "blue", "id": 31, "label": "027_051Backward", "shape": "dot", "value": 1, "x": 372.4282775820466, "y": 325.0259796194732}, {"color": "blue", "id": 32, "label": "027_05201_Nadir", "shape": "dot", "value": 1, "x": 298.89788396505173, "y": 260.2621011203155}, {"color": "blue", "id": 33, "label": "027_05359_Nadir", "shape": "dot", "value": 1, "x": 224.00710334000178, "y": 195.3485355200246}, {"color": "blue", "id": 34, "label": "027_05457_Nadir", "shape": "dot", "value": 1, "x": 148.71451215504203, "y": 130.22211251035333}, {"color": "blue", "id": 35, "label": "027_05555_Nadir", "shape": "dot", "value": 1, "x": 73.90258913801517, "y": 65.01631836034358}, {"color": "blue", "id": 36, "label": "027_05751_Nadir", "shape": "dot", "value": 1, "x": -74.01454035099596, "y": -65.71109293028712}, {"color": "blue", "id": 37, "label": "027_05849_Nadir", "shape": "dot", "value": 1, "x": -149.00930008897558, "y": -132.69112529046834}, {"color": "blue", "id": 38, "label": "027_05947_Nadir", "shape": "dot", "value": 1, "x": -221.51936748297885, "y": -197.50959535036236}, {"color": "blue", "id": 39, "label": "027_06045_Nadir", "shape": "dot", "value": 1, "x": -295.66500595898833, "y": -263.80876308027655}, {"color": "blue", "id": 40, "label": "027_061_Forward", "shape": "dot", "value": 1, "x": -369.0000332490308, "y": -328.9405428096652}, {"color": "blue", "id": 41, "label": "027_062_Forward", "shape": "dot", "value": 1, "x": -441.78351779596414, "y": -395.1139812897891}, {"color": "blue", "id": 42, "label": "027_063_Forward", "shape": "dot", "value": 1, "x": -514.9789797409903, "y": -462.1985588502139}, {"color": "blue", "id": 43, "label": "027_064_Forward", "shape": "dot", "value": 1, "x": -587.6606836880092, "y": -529.3200801499188}, {"color": "blue", "id": 44, "label": "027_065_Forward", "shape": "dot", "value": 1, "x": -660.5147338209208, "y": -596.5802765898407}, {"color": "blue", "id": 45, "label": "028_050_Forward", "shape": "dot", "value": 1, "x": 628.9447236660635, "y": 266.0525546995923}, {"color": "blue", "id": 46, "label": "028_051_Forward", "shape": "dot", "value": 1, "x": 554.9579527690075, "y": 198.61321168020368}, {"color": "blue", "id": 47, "label": "028_052_Forward", "shape": "dot", "value": 1, "x": 482.54912856803276, "y": 133.17348095029593}, {"color": "blue", "id": 48, "label": "028_05328_Nadir", "shape": "dot", "value": 1, "x": 411.10186102206353, "y": 68.88237466011196}, {"color": "blue", "id": 49, "label": "028_05430_Nadir", "shape": "dot", "value": 1, "x": 336.7745537930168, "y": 2.654276999644935}, {"color": "blue", "id": 50, "label": "028_05532_Nadir", "shape": "dot", "value": 1, "x": 263.13368039007764, "y": -62.51040957029909}, {"color": "blue", "id": 51, "label": "028_05634_Nadir", "shape": "dot", "value": 1, "x": 189.51521544298157, "y": -127.1371835200116}, {"color": "blue", "id": 52, "label": "028_05736_Nadir", "shape": "dot", "value": 1, "x": 114.87388850096613, "y": -192.25576443970203}, {"color": "blue", "id": 53, "label": "028_05839_Nadir", "shape": "dot", "value": 1, "x": 40.46740987699013, "y": -256.921787019819}, {"color": "blue", "id": 54, "label": "028_05941_Nadir", "shape": "dot", "value": 1, "x": -33.4275837210007, "y": -321.24421161040664}, {"color": "blue", "id": 55, "label": "028_06043_Nadir", "shape": "dot", "value": 1, "x": -107.61054163100198, "y": -386.15551069006324}, {"color": "blue", "id": 56, "label": "028_062Backward", "shape": "dot", "value": 1, "x": -256.09480912296567, "y": -517.1401462797076}, {"color": "blue", "id": 57, "label": "028_063Backward", "shape": "dot", "value": 1, "x": -329.04771277692635, "y": -582.52140623983}, {"color": "blue", "id": 58, "label": "028_064Backward", "shape": "dot", "value": 1, "x": -402.2576473619556, "y": -648.6705945301801}, {"color": "blue", "id": 59, "label": "028_065Backward", "shape": "dot", "value": 1, "x": -474.26209151698276, "y": -713.96652062051}, {"color": "blue", "id": 60, "label": "029_05419_Nadir", "shape": "dot", "value": 1, "x": 432.08320733800065, "y": -183.93625698052347}, {"color": "blue", "id": 61, "label": "029_05521_Right", "shape": "dot", "value": 1, "x": 355.88234769005794, "y": -250.13396015018225}, {"color": "blue", "id": 62, "label": "029_05521_Nadir", "shape": "dot", "value": 1, "x": 356.1567697440041, "y": -249.97711024992168}, {"color": "blue", "id": 63, "label": "029_05623_Right", "shape": "dot", "value": 1, "x": 281.2277081180364, "y": -315.267833949998}, {"color": "blue", "id": 64, "label": "029_05623_Nadir", "shape": "dot", "value": 1, "x": 281.35522788297385, "y": -315.2704757899046}, {"color": "blue", "id": 65, "label": "029_05726_Right", "shape": "dot", "value": 1, "x": 207.18052400299348, "y": -380.41265815030783}, {"color": "blue", "id": 66, "label": "029_05726_Nadir", "shape": "dot", "value": 1, "x": 207.18845146801323, "y": -380.53022876009345}, {"color": "blue", "id": 67, "label": "029_063Backward", "shape": "dot", "value": 1, "x": -232.59858789201826, "y": -782.053830309771}, {"color": "blue", "id": 68, "label": "029_064Backward", "shape": "dot", "value": 1, "x": -306.6255881040124, "y": -848.8168691499159}, {"color": "red", "id": 69, "label": "029_065Backward", "shape": "dot", "value": 1, "x": -380.5591092730174, "y": -915.2813454903662}]);
+        edges = new vis.DataSet([{"from": 0, "to": 37}, {"from": 0, "to": 34}, {"from": 0, "to": 36}, {"from": 0, "to": 21}, {"from": 0, "to": 20}, {"from": 0, "to": 50}, {"from": 0, "to": 23}, {"from": 0, "to": 51}, {"from": 0, "to": 35}, {"from": 0, "to": 22}, {"from": 1, "to": 20}, {"from": 1, "to": 8}, {"from": 1, "to": 32}, {"from": 1, "to": 2}, {"from": 1, "to": 33}, {"from": 1, "to": 3}, {"from": 2, "to": 32}, {"from": 2, "to": 5}, {"from": 2, "to": 33}, {"from": 2, "to": 34}, {"from": 2, "to": 10}, {"from": 2, "to": 3}, {"from": 2, "to": 8}, {"from": 2, "to": 4}, {"from": 3, "to": 33}, {"from": 3, "to": 22}, {"from": 3, "to": 34}, {"from": 3, "to": 12}, {"from": 3, "to": 5}, {"from": 3, "to": 8}, {"from": 3, "to": 4}, {"from": 3, "to": 10}, {"from": 4, "to": 22}, {"from": 4, "to": 21}, {"from": 4, "to": 8}, {"from": 4, "to": 6}, {"from": 4, "to": 10}, {"from": 4, "to": 5}, {"from": 4, "to": 62}, {"from": 4, "to": 12}, {"from": 5, "to": 21}, {"from": 5, "to": 23}, {"from": 5, "to": 62}, {"from": 5, "to": 10}, {"from": 5, "to": 7}, {"from": 5, "to": 12}, {"from": 5, "to": 6}, {"from": 6, "to": 21}, {"from": 6, "to": 22}, {"from": 6, "to": 24}, {"from": 6, "to": 25}, {"from": 6, "to": 12}, {"from": 6, "to": 7}, {"from": 6, "to": 53}, {"from": 7, "to": 24}, {"from": 7, "to": 25}, {"from": 7, "to": 23}, {"from": 7, "to": 38}, {"from": 7, "to": 37}, {"from": 7, "to": 39}, {"from": 7, "to": 54}, {"from": 8, "to": 10}, {"from": 8, "to": 35}, {"from": 8, "to": 33}, {"from": 8, "to": 34}, {"from": 8, "to": 12}, {"from": 9, "to": 14}, {"from": 9, "to": 33}, {"from": 9, "to": 22}, {"from": 9, "to": 21}, {"from": 9, "to": 18}, {"from": 9, "to": 11}, {"from": 9, "to": 20}, {"from": 9, "to": 13}, {"from": 9, "to": 19}, {"from": 10, "to": 35}, {"from": 10, "to": 0}, {"from": 10, "to": 62}, {"from": 10, "to": 12}, {"from": 11, "to": 19}, {"from": 11, "to": 20}, {"from": 11, "to": 24}, {"from": 11, "to": 18}, {"from": 11, "to": 14}, {"from": 11, "to": 23}, {"from": 11, "to": 13}, {"from": 11, "to": 22}, {"from": 11, "to": 21}, {"from": 12, "to": 35}, {"from": 12, "to": 0}, {"from": 12, "to": 62}, {"from": 13, "to": 20}, {"from": 13, "to": 25}, {"from": 13, "to": 24}, {"from": 13, "to": 22}, {"from": 13, "to": 21}, {"from": 13, "to": 23}, {"from": 13, "to": 14}, {"from": 14, "to": 21}, {"from": 14, "to": 23}, {"from": 14, "to": 22}, {"from": 14, "to": 25}, {"from": 14, "to": 17}, {"from": 14, "to": 15}, {"from": 14, "to": 24}, {"from": 15, "to": 25}, {"from": 15, "to": 24}, {"from": 15, "to": 29}, {"from": 15, "to": 27}, {"from": 15, "to": 23}, {"from": 15, "to": 13}, {"from": 15, "to": 11}, {"from": 15, "to": 28}, {"from": 15, "to": 22}, {"from": 16, "to": 20}, {"from": 16, "to": 21}, {"from": 16, "to": 25}, {"from": 16, "to": 17}, {"from": 16, "to": 39}, {"from": 16, "to": 31}, {"from": 16, "to": 30}, {"from": 16, "to": 38}, {"from": 16, "to": 37}, {"from": 16, "to": 24}, {"from": 17, "to": 13}, {"from": 17, "to": 30}, {"from": 17, "to": 31}, {"from": 17, "to": 25}, {"from": 17, "to": 39}, {"from": 17, "to": 23}, {"from": 17, "to": 37}, {"from": 17, "to": 24}, {"from": 17, "to": 38}, {"from": 18, "to": 21}, {"from": 18, "to": 35}, {"from": 18, "to": 34}, {"from": 18, "to": 19}, {"from": 18, "to": 26}, {"from": 18, "to": 32}, {"from": 18, "to": 20}, {"from": 18, "to": 33}, {"from": 19, "to": 22}, {"from": 19, "to": 35}, {"from": 19, "to": 21}, {"from": 19, "to": 20}, {"from": 19, "to": 33}, {"from": 19, "to": 32}, {"from": 19, "to": 34}, {"from": 20, "to": 22}, {"from": 20, "to": 34}, {"from": 20, "to": 33}, {"from": 20, "to": 21}, {"from": 20, "to": 35}, {"from": 21, "to": 23}, {"from": 21, "to": 22}, {"from": 21, "to": 36}, {"from": 21, "to": 34}, {"from": 21, "to": 35}, {"from": 22, "to": 23}, {"from": 22, "to": 37}, {"from": 22, "to": 35}, {"from": 22, "to": 36}, {"from": 22, "to": 24}, {"from": 23, "to": 25}, {"from": 23, "to": 24}, {"from": 23, "to": 38}, {"from": 23, "to": 36}, {"from": 23, "to": 37}, {"from": 24, "to": 38}, {"from": 24, "to": 37}, {"from": 24, "to": 25}, {"from": 24, "to": 39}, {"from": 24, "to": 36}, {"from": 25, "to": 39}, {"from": 25, "to": 30}, {"from": 25, "to": 38}, {"from": 25, "to": 37}, {"from": 25, "to": 31}, {"from": 26, "to": 29}, {"from": 26, "to": 27}, {"from": 26, "to": 40}, {"from": 26, "to": 28}, {"from": 26, "to": 20}, {"from": 26, "to": 42}, {"from": 26, "to": 32}, {"from": 26, "to": 33}, {"from": 26, "to": 41}, {"from": 27, "to": 44}, {"from": 27, "to": 29}, {"from": 27, "to": 41}, {"from": 27, "to": 43}, {"from": 27, "to": 28}, {"from": 27, "to": 40}, {"from": 27, "to": 42}, {"from": 27, "to": 33}, {"from": 28, "to": 43}, {"from": 28, "to": 42}, {"from": 28, "to": 40}, {"from": 28, "to": 44}, {"from": 28, "to": 41}, {"from": 28, "to": 20}, {"from": 28, "to": 29}, {"from": 29, "to": 41}, {"from": 29, "to": 25}, {"from": 29, "to": 24}, {"from": 29, "to": 43}, {"from": 29, "to": 44}, {"from": 29, "to": 42}, {"from": 30, "to": 46}, {"from": 30, "to": 38}, {"from": 30, "to": 47}, {"from": 30, "to": 45}, {"from": 30, "to": 31}, {"from": 30, "to": 24}, {"from": 30, "to": 37}, {"from": 31, "to": 47}, {"from": 31, "to": 46}, {"from": 31, "to": 38}, {"from": 31, "to": 37}, {"from": 31, "to": 45}, {"from": 31, "to": 24}, {"from": 32, "to": 35}, {"from": 32, "to": 20}, {"from": 32, "to": 49}, {"from": 32, "to": 33}, {"from": 32, "to": 48}, {"from": 32, "to": 40}, {"from": 32, "to": 34}, {"from": 33, "to": 21}, {"from": 33, "to": 35}, {"from": 33, "to": 34}, {"from": 33, "to": 49}, {"from": 33, "to": 50}, {"from": 33, "to": 48}, {"from": 34, "to": 35}, {"from": 34, "to": 48}, {"from": 34, "to": 49}, {"from": 35, "to": 36}, {"from": 35, "to": 49}, {"from": 35, "to": 50}, {"from": 36, "to": 51}, {"from": 36, "to": 38}, {"from": 36, "to": 37}, {"from": 36, "to": 52}, {"from": 37, "to": 39}, {"from": 37, "to": 38}, {"from": 37, "to": 52}, {"from": 37, "to": 53}, {"from": 38, "to": 39}, {"from": 38, "to": 53}, {"from": 38, "to": 55}, {"from": 38, "to": 54}, {"from": 39, "to": 53}, {"from": 39, "to": 36}, {"from": 39, "to": 54}, {"from": 39, "to": 55}, {"from": 39, "to": 47}, {"from": 40, "to": 51}, {"from": 40, "to": 43}, {"from": 40, "to": 57}, {"from": 40, "to": 41}, {"from": 40, "to": 56}, {"from": 40, "to": 42}, {"from": 41, "to": 44}, {"from": 41, "to": 43}, {"from": 41, "to": 56}, {"from": 41, "to": 57}, {"from": 41, "to": 42}, {"from": 42, "to": 57}, {"from": 42, "to": 44}, {"from": 42, "to": 56}, {"from": 42, "to": 43}, {"from": 43, "to": 56}, {"from": 43, "to": 58}, {"from": 43, "to": 57}, {"from": 43, "to": 44}, {"from": 44, "to": 38}, {"from": 44, "to": 59}, {"from": 44, "to": 58}, {"from": 44, "to": 0}, {"from": 45, "to": 0}, {"from": 45, "to": 50}, {"from": 45, "to": 35}, {"from": 45, "to": 51}, {"from": 45, "to": 38}, {"from": 45, "to": 46}, {"from": 45, "to": 37}, {"from": 45, "to": 47}, {"from": 46, "to": 25}, {"from": 46, "to": 36}, {"from": 46, "to": 38}, {"from": 46, "to": 47}, {"from": 46, "to": 39}, {"from": 46, "to": 54}, {"from": 46, "to": 55}, {"from": 47, "to": 36}, {"from": 47, "to": 37}, {"from": 47, "to": 54}, {"from": 47, "to": 55}, {"from": 47, "to": 38}, {"from": 48, "to": 51}, {"from": 48, "to": 35}, {"from": 48, "to": 49}, {"from": 48, "to": 56}, {"from": 48, "to": 50}, {"from": 48, "to": 60}, {"from": 49, "to": 52}, {"from": 49, "to": 0}, {"from": 49, "to": 51}, {"from": 49, "to": 50}, {"from": 49, "to": 60}, {"from": 50, "to": 53}, {"from": 50, "to": 36}, {"from": 50, "to": 52}, {"from": 50, "to": 51}, {"from": 50, "to": 34}, {"from": 50, "to": 60}, {"from": 51, "to": 54}, {"from": 51, "to": 37}, {"from": 51, "to": 52}, {"from": 51, "to": 53}, {"from": 51, "to": 35}, {"from": 51, "to": 62}, {"from": 52, "to": 54}, {"from": 52, "to": 53}, {"from": 52, "to": 62}, {"from": 52, "to": 0}, {"from": 52, "to": 64}, {"from": 53, "to": 55}, {"from": 53, "to": 54}, {"from": 53, "to": 64}, {"from": 53, "to": 36}, {"from": 54, "to": 55}, {"from": 54, "to": 37}, {"from": 54, "to": 66}, {"from": 54, "to": 36}, {"from": 55, "to": 52}, {"from": 55, "to": 66}, {"from": 55, "to": 44}, {"from": 55, "to": 37}, {"from": 56, "to": 59}, {"from": 56, "to": 67}, {"from": 56, "to": 32}, {"from": 56, "to": 57}, {"from": 56, "to": 58}, {"from": 57, "to": 44}, {"from": 57, "to": 59}, {"from": 57, "to": 67}, {"from": 57, "to": 58}, {"from": 58, "to": 28}, {"from": 58, "to": 67}, {"from": 58, "to": 42}, {"from": 58, "to": 41}, {"from": 58, "to": 59}, {"from": 59, "to": 42}, {"from": 59, "to": 43}, {"from": 59, "to": 67}, {"from": 60, "to": 66}, {"from": 60, "to": 52}, {"from": 60, "to": 0}, {"from": 60, "to": 51}, {"from": 60, "to": 35}, {"from": 60, "to": 62}, {"from": 60, "to": 64}, {"from": 61, "to": 35}, {"from": 61, "to": 0}, {"from": 61, "to": 34}, {"from": 61, "to": 19}, {"from": 61, "to": 22}, {"from": 61, "to": 20}, {"from": 61, "to": 11}, {"from": 61, "to": 21}, {"from": 61, "to": 65}, {"from": 62, "to": 49}, {"from": 62, "to": 53}, {"from": 62, "to": 0}, {"from": 62, "to": 66}, {"from": 62, "to": 64}, {"from": 62, "to": 50}, {"from": 64, "to": 0}, {"from": 64, "to": 54}, {"from": 64, "to": 12}, {"from": 64, "to": 50}, {"from": 64, "to": 66}, {"from": 64, "to": 51}, {"from": 65, "to": 25}, {"from": 65, "to": 36}, {"from": 65, "to": 37}, {"from": 65, "to": 23}, {"from": 65, "to": 24}, {"from": 65, "to": 22}, {"from": 65, "to": 0}, {"from": 65, "to": 13}, {"from": 66, "to": 51}, {"from": 66, "to": 53}, {"from": 66, "to": 67}, {"from": 66, "to": 52}, {"from": 66, "to": 68}, {"from": 67, "to": 53}, {"from": 67, "to": 52}, {"from": 67, "to": 68}, {"from": 67, "to": 64}, {"from": 67, "to": 62}, {"from": 67, "to": 69}, {"from": 68, "to": 53}, {"from": 68, "to": 52}, {"from": 68, "to": 62}, {"from": 68, "to": 69}, {"from": 68, "to": 64}, {"from": 69, "to": 53}, {"from": 69, "to": 66}, {"from": 69, "to": 56}, {"from": 69, "to": 64}]);
+
+        // adding nodes and edges to the graph
+        data = {nodes: nodes, edges: edges};
+
+        var options = {
+    "configure": {
+        "enabled": true,
+        "filter": [
+            "nodes",
+            "edges"
+        ]
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": false,
+            "type": "continuous"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+        
+        
+
+        
+        // if this network requires displaying the configure window,
+        // put it in its div
+        options.configure["container"] = document.getElementById("config");
+        
+
+        network = new vis.Network(container, data, options);
+	 
+        
+
+
+        
+
+        return network;
+
+    }
+
+    drawGraph();
+
+</script>
+</body>
+</html>

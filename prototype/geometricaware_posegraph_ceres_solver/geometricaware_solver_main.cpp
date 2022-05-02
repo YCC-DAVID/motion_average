@@ -8,7 +8,7 @@
 #include <ceres/loss_function.h>
 
 using namespace std;
-using namespace motionavg;
+using namespace motionavg::Affine2D;
 
 
 struct Reprojection_Error {
@@ -57,7 +57,7 @@ int main(int argc, char** argv)
 	fs::path output_ceres_report = inputdir / (inputname + "_geoawarereport.txt");
 
 	ifstream ifs(input_graph_path.string());
-	motionavg::PoseGraph graph;
+	motionavg::Affine2D::PoseGraph graph;
 	ifs >> graph;
 	ifs.close();
 

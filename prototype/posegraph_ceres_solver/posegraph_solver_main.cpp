@@ -10,7 +10,7 @@
 #include "mystructs.h"
 
 using namespace std;
-using namespace motionavg;
+using namespace motionavg::Affine2D;
 constexpr double LINEAR_PART_WEIGHT = 100;
 
 struct Additive_PoseError {
@@ -45,7 +45,7 @@ struct Additive_PoseError {
 		return true;
 	}
 
-	static ceres::CostFunction* Create(const motionavg::PoseGraph::Edge& e)
+	static ceres::CostFunction* Create(const motionavg::Affine2D::PoseGraph::Edge& e)
 	{
 		return (new ceres::AutoDiffCostFunction<Additive_PoseError, 6, 6, 6>(new Additive_PoseError(e.regXfm)));
 	}
@@ -89,7 +89,7 @@ struct Compositional_PoseError {
 		return true;
 	}
 
-	static ceres::CostFunction* Create(const motionavg::PoseGraph::Edge& e)
+	static ceres::CostFunction* Create(const motionavg::Affine2D::PoseGraph::Edge& e)
 	{
 		return (new ceres::AutoDiffCostFunction<Compositional_PoseError, 6, 6, 6>(new Compositional_PoseError(e.regXfm)));
 	}
@@ -105,7 +105,7 @@ int main(int argc, char** argv)
 	fs::path output_ceres_report = inputdir / (inputname + "_ceresreport.txt");
 	
 	ifstream ifs(input_graph_path.string());
-	motionavg::PoseGraph graph;
+	motionavg::Affine2D::PoseGraph graph;
 	ifs >> graph;
 	ifs.close();
 

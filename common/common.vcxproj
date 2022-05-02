@@ -27,6 +27,7 @@
     <ClInclude Include="Mathapi.h" />
     <ClInclude Include="myutils.h" />
     <ClInclude Include="mystructs.h" />
+    <ClInclude Include="qin_io.h" />
     <ClInclude Include="tem_codes.h" />
   </ItemGroup>
   <ItemGroup>

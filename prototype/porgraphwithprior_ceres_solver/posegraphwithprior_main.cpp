@@ -14,7 +14,7 @@
 #include "mystructs.h"
 
 using namespace std;
-using namespace motionavg;
+using namespace motionavg::Affine2D;
 
 struct AdditiveWithPrior_PoseError {
 
@@ -56,7 +56,7 @@ struct AdditiveWithPrior_PoseError {
 		return true;
 	}
 
-	static ceres::CostFunction* Create(const motionavg::PoseGraph::Edge& e)
+	static ceres::CostFunction* Create(const motionavg::Affine2D::PoseGraph::Edge& e)
 	{
 		return (new ceres::AutoDiffCostFunction<AdditiveWithPrior_PoseError, 6, 6, 6>(new AdditiveWithPrior_PoseError(e.regXfm, e.covXfm)));
 	}
@@ -96,7 +96,7 @@ struct AdditiveWithPrior_PoseError {
 //		return true;
 //	}
 //
-//	static ceres::CostFunction* Create(const motionavg::PoseGraph::Edge& e)
+//	static ceres::CostFunction* Create(const motionavg::Affine2D::PoseGraph::Edge& e)
 //	{
 //		return (new ceres::AutoDiffCostFunction<Compositional_PoseError, 6, 6, 6>(new Compositional_PoseError(e.regXfm)));
 //	}
@@ -113,7 +113,7 @@ int main(int argc, char** argv)
 	fs::path output_ceres_report = inputdir / (inputname + "_wpriorceresreport.txt");
 
 	ifstream ifs(input_graph_path.string());
-	motionavg::PoseGraph graph;
+	motionavg::Affine2D::PoseGraph graph;
 	ifs >> graph;
 	ifs.close();
 
