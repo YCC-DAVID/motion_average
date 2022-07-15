@@ -49,6 +49,45 @@ bool read_correspondence_pts_pix_binary(const char* filename, float* datapointer
   return true;
 }
 
+bool write_correspondence_offset_binary(const char* filename, float* data, unsigned int num_pts) {
+  std::ofstream ofs(filename, std::ios::binary);
+  if (!ofs.is_open()) {
+    std::cerr << "file open error " << filename << std::endl;
+    return false;
+  }
+
+  ofs.write((char*)&num_pts, sizeof(decltype(num_pts)));
+  ofs.write((char*)data, sizeof(float) * num_pts * 4);
+  ofs.close();
+  return true;
+}
+
+
+bool read_correspondence_offset_binary_num(const char* filename, unsigned int& numpts) {
+  std::fstream fs(filename, std::ios::in | std::ios::binary);
+  if (!fs.is_open()) {
+    std::cout << "file opening error" << std::endl;
+    return false;
+  }
+  fs.read((char*)&numpts, sizeof(unsigned int));
+  fs.close();
+}
+//
+bool read_correspondence_offset_binary(const char* filename, float* datapointerout) {
+  std::fstream fs(filename, std::ios::in | std::ios::binary);
+  if (!fs.is_open()) {
+    std::cout << "file opening error" << std::endl;
+    return false;
+  }
+
+  unsigned int numpt;
+  fs.read((char*)&numpt, sizeof(unsigned int));
+  fs.read((char*)datapointerout, sizeof(float) * numpt * 4);
+  fs.close();
+
+  return true;
+}
+
 vector<QinPose> readQinv2File(std::string input_qin) {
   ifstream ifs(input_qin);
   size_t num_pose;
@@ -82,6 +121,7 @@ cxxopts::Options parseOptions(std::string exepath = "") {
 int main(int argc, char** argv) {
   GDALAllRegister();
 
+  float INVALID_VALUE = std::numeric_limits<float>::infinity();
   cxxopts::Options options = parseOptions(argv[0]);
   cxxopts::ParseResult args = options.parse(argc, argv);
   spdlog::set_level(static_cast<logg::level::level_enum>(args["verbose"].as<int>()));
@@ -180,7 +220,7 @@ int main(int argc, char** argv) {
     XYZGrid srcXYZ(true);
     srcXYZ.open(srcgridpath, srcraynumpath);
 
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for (int j = 1; j < maxpair + 1; ++j)  // j-th neighbor
     {
       if (ids[j] == -1) continue;
@@ -191,6 +231,7 @@ int main(int argc, char** argv) {
       string tgtName = fs::path(g.nodes[tgtId].name).stem().string();
       // if (tgtName != "029_056_id3179c82579_124523_Nadir") continue;
       fs::path correspondencepixbin = tempfolderdirpath / srcName / fmt::format("{}_{}_correspondence_pix.bin", srcName, tgtName);
+      fs::path correspondenceoffsetbin = tempfolderdirpath / srcName / fmt::format("{}_{}_correspondence_offset.bin", srcName, tgtName);
 
       e.name = fs::relative(correspondencepixbin, rootdirpath).string();
       if (!fs::exists(correspondencepixbin)) {
@@ -203,7 +244,9 @@ int main(int argc, char** argv) {
       spdlog::trace("numpts {}", numpts);
       if (numpts < minimum_matches) continue;
       std::unique_ptr<float> matches(new float[4 * numpts]);
+      std::unique_ptr<float> offset_n_weight(new float[4 * numpts]);
       read_correspondence_pts_pix_binary(correspondencepixbin.string().c_str(), matches.get());
+
       spdlog::trace("src {} tgt {}", srcName, tgtName);
 
       // clang-format off
@@ -255,6 +298,8 @@ int main(int argc, char** argv) {
       float totalWeight = 0;
       for (int k = 0; k < numpts; k += 1)  // k-th matched points
       {
+        std::fill_n(offset_n_weight.get() + 4 * k, 3, INVALID_VALUE);
+        offset_n_weight.get()[4 * k + 3] = 0;
         float& srcX = matches.get()[4 * k + 0];
         float& srcY = matches.get()[4 * k + 1];
         float& tgtX = matches.get()[4 * k + 2];
@@ -269,13 +314,19 @@ int main(int argc, char** argv) {
         bool valid00 = srcTmpXYZ.sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], srcTmpNumRay);
         if (!valid00) continue;
 
+        
+        
         if (srcNumRay < minimum_rays || tgtNumRay < minimum_rays) continue;
-
         else {
           ++numMatch;
           float _weight = std::pow(srcTmpMatch[0] - srcMatch[0], 2) + std::pow(srcTmpMatch[1] - srcMatch[1], 2) + std::pow(srcTmpMatch[2] - srcMatch[2], 2);
           _weight = std::exp(-invsigmasq_2 * _weight);
           totalWeight += _weight;
+          
+          offset_n_weight.get()[4 * k + 0] = srcMatch[0] - tgtMatch[0];
+          offset_n_weight.get()[4 * k + 1] = srcMatch[1] - tgtMatch[1];
+          offset_n_weight.get()[4 * k + 2] = srcMatch[2] - tgtMatch[2];
+          offset_n_weight.get()[4 * k + 3] = _weight;
 #if FIND_MEDIAN
           double _distsq = 0;
 #endif
@@ -331,10 +382,10 @@ int main(int argc, char** argv) {
 
       #pragma omp critical
       g.insertEdge(e);
-      // break;
+
+      write_correspondence_offset_binary(correspondenceoffsetbin.string().c_str(), offset_n_weight.get(), numpts);
     }
     delete[] ids;
-    // break;
   }
   ifs.close();
 

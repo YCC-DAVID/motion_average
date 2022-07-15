@@ -2,12 +2,12 @@
 #include <spdlog/spdlog.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <cxxopts.hpp>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 #include "MoAve_0.h"
 #include "MoAve_Affine.h"
@@ -15,6 +15,7 @@
 #include "myutils.h"
 
 using namespace std;
+namespace logg = spdlog;
 using namespace motionavg::TranslateND;
 using GraphT = TranslateGraph<3>;
 
@@ -171,13 +172,46 @@ void normalize_graph(GraphT& g) {
     for (int _d = 0; _d < 3; ++_d) g.edges[i].cov[_d * 4] /= median;
 }
 
+cxxopts::Options parseOptions(std::string exepath = "") {
+  std::string exename = fs::path(exepath).filename().string();
+  cxxopts::Options options(exename, "create_graph from folder");
+  // clang-format off
+  options.add_options()
+    ("i,input_graph", "input graph", cxxopts::value<std::string>())
+	("o,output_name", "output filename", cxxopts::value<std::string>()->default_value("graph.txt"))
+	("h,help", "Print help")
+	("v,verbose", "verbose level (trace - 0, debug - 1, info - 2, warn - 3, error - 4, critical - 5, off - 6)", cxxopts::value<int>()->default_value("2"))
+	;
+  // clang-format on
+
+  options.parse_positional({"input_graph", "output_name"});
+  options.positional_help("input_graph output_name [options]");
+  return options;
+}
 
 int main(int argc, char** argv) {
-  spdlog::set_level(spdlog::level::info);
-  string ingraph = "N:\\citymapper_70\\res\\graph.txt";
-  string directgraphpath = "N:\\citymapper_70\\res\\graph_direct.txt";
-  string itergraphpath = "N:\\citymapper_70\\res\\graph_iter.txt";
-  ifstream ifs(ingraph);
+  cxxopts::Options options = parseOptions(argv[0]);
+  cxxopts::ParseResult args = options.parse(argc, argv);
+  spdlog::set_level(static_cast<logg::level::level_enum>(args["verbose"].as<int>()));
+
+  if (args.count("help") != 0) {
+    cout << options.help() << endl;
+    return 0;
+  }
+  fs::path input_graph(args["input_graph"].as<string>());
+  fs::path output_name(args["output_name"].as<string>());
+  if (output_name.is_relative()) output_name = input_graph.parent_path() / output_name;
+
+  spdlog::info("Input:  {}", input_graph.string());
+  spdlog::info("Output: {}", output_name.string());
+
+  if (!fs::exists(input_graph)) {
+    spdlog::error("File not found: {}", input_graph.string());
+    cout << options.help() << endl;
+    return 0;
+  }
+
+  ifstream ifs(input_graph.string());
 
   GraphT g;
   ifs >> g;
@@ -187,7 +221,7 @@ int main(int argc, char** argv) {
   g.rebase(0);
   GraphT direct = solve_translate_MoAve_0_direct(g);
   direct.rebase(-1);
-  ofstream ofs(directgraphpath);
+  ofstream ofs(output_name.string());
   ofs << direct;
   ofs.close();
   evaluate(direct, false);

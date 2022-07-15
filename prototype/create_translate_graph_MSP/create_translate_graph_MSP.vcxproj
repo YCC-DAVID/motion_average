@@ -151,6 +151,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="create_translate_graph_msp.cpp" />
+    <ClCompile Include="XYZGrid.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="XYZGrid.h" />

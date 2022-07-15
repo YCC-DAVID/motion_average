@@ -1,11 +1,14 @@
 [requires]
 gdal/3.1.0
+zlib/1.2.12
 eigen/3.4.0
 ceres-solver/2.0.0
 cxxopts/3.0.0
 spdlog/1.9.2
 doctest/2.4.8
 pdal/2.3.0
+libgeotiff/1.7.0
+libcurl/7.80.0
 
 [generators]
 visual_studio
