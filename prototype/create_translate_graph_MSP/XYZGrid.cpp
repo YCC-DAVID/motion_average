@@ -58,9 +58,9 @@ bool XYZGrid::open(const fs::path gridpath[3], const fs::path raynumpath) {
   bool valid = true;
   if (preload) {
     int c0 = px;
-    int c1 = px + 1;
+    int c1 = std::min<int>(px + 1,width-1);
     int r0 = py;
-    int r1 = py + 1;
+    int r1 = std::min<int>(py + 1, height - 1);
     float cw = px - c0;
     float rw = py - r0;
     for (int _d = 0; _d < 3; ++_d) {

@@ -18,5 +18,8 @@
     <ClCompile Include="apply_translate_msp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\create_translate_graph_MSP\XYZGrid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
