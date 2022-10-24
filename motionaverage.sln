@@ -119,6 +119,12 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "convert_correspondence_txt", "prototype\convert_correspondence_txt\convert_correspondence_txt.vcxproj", "{407F45F5-12F2-44CD-8688-1368A1D716A0}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{252F6067-F71F-4E44-B55A-CE729727336A}"
+	ProjectSection(SolutionItems) = preProject
+		scripts\Additive_Affine2withPrior.py = scripts\Additive_Affine2withPrior.py
+		scripts\analysis_itersolver.py = scripts\analysis_itersolver.py
+		scripts\filter_correspondence_offset.py = scripts\filter_correspondence_offset.py
+		scripts\plot_trans3d_graph.py = scripts\plot_trans3d_graph.py
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

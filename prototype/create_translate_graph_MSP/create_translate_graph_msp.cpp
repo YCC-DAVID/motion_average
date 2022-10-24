@@ -128,9 +128,13 @@ int main(int argc, char** argv) {
 
   if (args.count("help") != 0) {
     cout << options.help() << endl;
-    ;
     return 0;
   }
+  if (args.count("input_folder") == 0 || args.count("qinv2file") == 0) {
+    cout << options.help() << endl;
+    return 0;
+  }
+
   fs::path rootdirpath(args["input_folder"].as<string>());
   fs::path qinv2path(args["qinv2file"].as<string>());
   fs::path outfilename(args["output_name"].as<string>()), outfilepath;
@@ -220,7 +224,7 @@ int main(int argc, char** argv) {
     XYZGrid srcXYZ(true);
     srcXYZ.open(srcgridpath, srcraynumpath);
 
-    //#pragma omp parallel for
+    #pragma omp parallel for
     for (int j = 1; j < maxpair + 1; ++j)  // j-th neighbor
     {
       if (ids[j] == -1) continue;

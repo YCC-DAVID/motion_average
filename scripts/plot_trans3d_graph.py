@@ -84,7 +84,7 @@ if __name__ == "__main__":
             dist = np.linalg.norm(offset)
             print(dist,": ",offset)
 
-    sys.exit(0)
+    # sys.exit(0)
 
     for ei, e in enumerate(g1.edges):
         initxfm = g1.nodes[e.target].xfm - g1.nodes[e.source].xfm
@@ -96,12 +96,12 @@ if __name__ == "__main__":
         # print(f'Edge: {edgexfm}')
         print(f'Diff: {diffxfm}')
 
-    sys.exit(0)
+    # sys.exit(0)
 
-    baseXfm = tg.nodes[0].xfm
+    baseXfm = g1.nodes[0].xfm
 
     net = Network()
-    for ni, n in enumerate(tg.nodes):
+    for ni, n in enumerate(g1.nodes):
 
         font_color='blue'
         if n.name == '029_065_id3188c81615_124544_Backward.tif':
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         label = n.name[:7]+n.name[-12:-4]
         net.add_node(ni,  label, value=1, x=n.xfm[0]-baseXfm[0], y=n.xfm[1]-baseXfm[1], color=font_color)
 
-    for ei, e in enumerate(tg.edges):
+    for ei, e in enumerate(g1.edges):
         net.add_edge(e.source, e.target)
 
     # net.toggle_physics(True)

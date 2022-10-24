@@ -79,9 +79,14 @@ int main(int argc, char** argv) {
 
   if (args.count("help") != 0) {
     cout << options.help() << endl;
-    ;
     return 0;
   }
+
+  if (args.count("input_folder") == 0 || args.count("graphfile") == 0) {
+    cout << options.help() << endl;
+    return 0;
+  }
+
   fs::path rootdirpath(args["input_folder"].as<string>());
   fs::path graphfilepath(args["graphfile"].as<string>());
   fs::path outdirpath(args["output_folder"].as<string>());

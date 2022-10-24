@@ -198,6 +198,12 @@ int main(int argc, char** argv) {
     cout << options.help() << endl;
     return 0;
   }
+
+  if (args.count("input_graph") == 0) {
+    cout << options.help() << endl;
+    return 0;
+  }
+
   fs::path input_graph(args["input_graph"].as<string>());
   fs::path output_name(args["output_name"].as<string>());
   if (output_name.is_relative()) output_name = input_graph.parent_path() / output_name;
