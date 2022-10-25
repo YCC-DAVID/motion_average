@@ -16,6 +16,26 @@ This class only deal with numerical computations
 --
 ***************************************************************************/
 
+/// <summary>
+/// Uniary unit for building a uniary constraint for nodes
+/// </summary>
+class UnaryG_Unit {
+ public:
+  UnaryG_Unit() {
+    LinkWeight = -1;
+    RefID = -1;
+    reserved1 = -1;
+    reserved2 = -1;
+  }
+  ~UnaryG_Unit() {}
+  double LinkWeight;
+  int RefID;
+  int reserved1;
+  int reserved2;
+  std::vector<double> AbsParaVec;
+  std::vector<double> InvCovMatrix;
+};
+
 /*****************************************************************************
 basic unit to build the connectivity graph, other ConGUnit can inherit from it
 for specific applications
@@ -91,6 +111,8 @@ class MotionAverage_T {
   ****************************************************************************************/
   bool virtual Initialize(std::vector<std::vector<double>> Node_Para_list, int num_para_per_node, std::vector<std::vector<ConG_Unit>>& Con_Graph);
 
+  bool virtual SetUnaryGraph(std::vector<std::vector<UnaryG_Unit>>& Unary_Graph);
+
   /***************************************************************************************
   This virtual function needs to be overload to the specific problem.
   ****************************************************************************************/
@@ -163,6 +185,7 @@ class MotionAverage_T {
                                    // if this is empty (not initialized externally),the program will initialize this using the Con_Graph.
   double _epslon;
   std::vector<std::vector<ConG_Unit>>* _Con_Graph;
+  std::vector<std::vector<UnaryG_Unit>>* _Unary_Graph;
   std::vector<std::vector<double>> _NodeParaInvCovMatrix;  // this is the Node_level CovarianceMatrix,describing the relative importance of the parameters
   std::vector<unsigned char> _Ref_Node_Status;             // dimension the same as the number of nodes,255 means ref node and 0 means non-ref node, for weighting purpose.
 };

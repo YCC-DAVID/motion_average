@@ -18,8 +18,8 @@ MoAve_0::~MoAve_0() {}
 
 #ifdef USE_CERES_SOLVER
 
-struct Translate3WithPriorAD {
-  Translate3WithPriorAD(const double* data, const double* weight) {
+struct PairwiseTranslate3WithPriorAD {
+  PairwiseTranslate3WithPriorAD(const double* data, const double* weight) {
     std::copy_n(data, 3, xfm);
     std::copy_n(weight, 9, P);
   }
@@ -36,9 +36,36 @@ struct Translate3WithPriorAD {
     return true;
   }
 
-  static ceres::CostFunction* Create(const double* data, const double* weight) { return (new ceres::AutoDiffCostFunction<Translate3WithPriorAD, 3, 3, 3>(new Translate3WithPriorAD(data, weight))); }
+  static ceres::CostFunction* Create(const double* data, const double* weight) {
+    return (new ceres::AutoDiffCostFunction<PairwiseTranslate3WithPriorAD, 3, 3, 3>(new PairwiseTranslate3WithPriorAD(data, weight)));
+  }
   double xfm[3];
   double P[9];  // 3x3 weight matrix
+};
+
+struct UnaryTranslate3WithPriorAD {
+  UnaryTranslate3WithPriorAD(const double* xyz, const double* weight) {
+    std::copy_n(xyz, 3, target);
+    std::copy_n(weight, 9, P);
+  }
+  template <typename T>
+  bool operator()(const T* v0, T* residuals) const {
+    T tem[3];
+    for (int i = 0; i < 3; ++i) tem[i] = v0[i] - target[i];
+
+    for (int i = 0; i < 3; ++i) {
+      residuals[i] = T(0.);
+      for (int j = 0; j < 3; ++j) residuals[i] += P[3 * i + j] * tem[j];
+    }
+    return true;
+  }
+
+  static ceres::CostFunction* Create(const double* data, const double* weight) {
+    return (new ceres::AutoDiffCostFunction<UnaryTranslate3WithPriorAD, 3, 3>(new UnaryTranslate3WithPriorAD(data, weight)));
+  }
+
+  double target[3];
+  double P[9];
 };
 
 #endif
@@ -58,19 +85,33 @@ bool MoAve_0::DirectSolver_Run() {
   size_t num_nodes = std::min<size_t>(_Node_Para_list.size(), _Con_Graph->size());
 
   for (size_t ni = 0; ni < num_nodes; ++ni) {
+    // Pairwise xfm constraints
     for (size_t ei = 0; ei < (*_Con_Graph)[ni].size(); ++ei) {
       const auto& e = (*_Con_Graph)[ni][ei];
 
       if (e.RefID != ni) {
-        std::cout << "Edge.RefID " << e.RefID << " doesn't much Con_Graph block " << ni << std::endl;
+        std::cerr << "Edge.RefID " << e.RefID << " doesn't much Con_Graph block " << ni << std::endl;
         continue;
       }
 
-      ceres::CostFunction* cost_function = Translate3WithPriorAD::Create(e.RelParaVec.data(), e.InvCovMatrix.data());
-      // ceres::CostFunction* cost_function = new Translate3WithPriorAD(e.RelParaVec.data(), e.InvCovMatrix.data());
+      ceres::CostFunction* cost_function = PairwiseTranslate3WithPriorAD::Create(e.RelParaVec.data(), e.InvCovMatrix.data());
       problem.AddResidualBlock(cost_function, nullptr, _Node_Para_list[e.RefID].data(), _Node_Para_list[e.OtherID].data());
     }
+    // Unary xfm constraints
+    for (size_t ei = 0; ei < (*_Unary_Graph)[ni].size();++ei) {
+      const auto& e = (*_Unary_Graph)[ni][ei];
+
+      if (e.RefID != ni)
+      {
+        std::cerr << "Edge.RefID " << e.RefID << " doesn't much Unary_Graph block " << ni << std::endl;
+        continue;
+      }
+
+      ceres::CostFunction* cost_function = UnaryTranslate3WithPriorAD::Create(e.AbsParaVec.data(), e.InvCovMatrix.data());
+      problem.AddResidualBlock(cost_function, nullptr, _Node_Para_list[e.RefID].data());
+    }
   }
+
   // Solve problem
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;

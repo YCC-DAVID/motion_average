@@ -17,6 +17,8 @@ class MoAve_0 : public MotionAverage_T {
 
   bool DirectSolver_Run();
 
+  
+
  private:
   bool _LocalSolver(int index_i);
 };

@@ -10,6 +10,7 @@ pdal/2.3.0
 libgeotiff/1.7.0
 libcurl/7.80.0
 libiconv/1.16
+nlohmann_json/3.11.2
 
 [generators]
 visual_studio

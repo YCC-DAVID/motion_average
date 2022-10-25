@@ -26,7 +26,7 @@ namespace fs = std::filesystem;
 namespace logg = spdlog;
 using namespace std;
 using namespace motionavg::TranslateND;
-using GraphT = TranslateGraph<3>;
+using GraphT = TranslateGraph3WithGCP;
 
 cxxopts::Options parseOptions(std::string exepath = "") {
   std::string exename = fs::path(exepath).filename().string();
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
 
   GraphT g;
   ifstream ifs(graphfilepath.string());
-  ifs >> g;
+  ifs >> &g;
   ifs.close();
 
   if (args.count("inqinv2") > 0) {

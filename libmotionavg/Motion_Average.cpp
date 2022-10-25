@@ -7,6 +7,8 @@ MotionAverage_T::MotionAverage_T() {
   _epslon = 1e-6;
   _Relax_Factor = 1;
   _num_para_per_node = 0;  // 0 means non intialized.
+  _Con_Graph = nullptr;
+  _Unary_Graph = nullptr;
 }
 
 MotionAverage_T::~MotionAverage_T() {}
@@ -62,6 +64,11 @@ bool MotionAverage_T::Initialize(std::vector<std::vector<double>> Node_Para_list
       for (int p2 = 0; p2 < (*_Con_Graph)[p1].size(); p2++) (*_Con_Graph)[p1][p2].InvCovMatrix.assign(temInvCov.begin(), temInvCov.end());
   }
 
+  return true;
+}
+
+bool MotionAverage_T::SetUnaryGraph(std::vector<std::vector<UnaryG_Unit>>& Unary_Graph) {
+  this->_Unary_Graph = &Unary_Graph;
   return true;
 }
 

@@ -26,6 +26,7 @@ struct Edge {
     for (int i = 0; i < N; ++i) cov[N * i + i] = 1.;
   }
 };
+
 template <int N>
 struct TranslateGraph {
   static constexpr int DIM = N;
@@ -70,7 +71,55 @@ struct TranslateGraph {
     std::copy_n(newbaseCopy, N, baseGeo);
   }
 };
+
+// Store 3D point table and
+struct GCPGraph {
+  struct GCPPoint {
+    GCPPoint() : x(0.f), y(0.f), z(0.f), ex(999.f), ey(999.f), ez(999.f){};
+    std::string name;
+    double x, y, z;
+    double ex, ey, ez;  // std deviation
+  };
+  struct GCPLink {
+    GCPLink() : gcpid(-1), viewid(-1), u(0.f), v(0.f), dx(0.f), dy(0.f), dz(0.f), ex(999.f), ey(999.f), ez(999.f){};
+    int gcpid;
+    int viewid;
+    float u, v;         // u (col), v (row) on image (top left origin)
+    float dx, dy, dz;   // 3d translation from camera center to GCP
+    double ex, ey, ez;  // std deviation of 3d translation
+  };
+
+  GCPGraph() : baseGCP{0.f} {}
+
+  std::vector<GCPPoint> gcps;
+  std::vector<GCPLink> gcplinks;
+  double baseGCP[3];
+  void rebaseGCP(const double* newbase) {
+    double newbaseCopy[3];
+    std::copy_n(newbase, 3, newbaseCopy);
+    for (auto& gcp : gcps) {
+      gcp.x += baseGCP[0] - newbaseCopy[0];
+      gcp.y += baseGCP[1] - newbaseCopy[1];
+      gcp.z += baseGCP[2] - newbaseCopy[2];
+    }
+    std::copy_n(newbaseCopy, 3, baseGCP);
+  }
+};
+
+struct TranslateGraph3WithGCP : public TranslateGraph<3>, public GCPGraph {
+  
+  void rebase(int i) {
+    TranslateGraph<3>::rebase(i);
+    GCPGraph::rebaseGCP(baseGeo);
+  }
+  void rebase(const double* newbase) {
+    TranslateGraph<3>::rebase(newbase);
+    GCPGraph::rebaseGCP(baseGeo);
+    //assert((baseGeo[0] == baseGCP[0]) && (baseGeo[1] == baseGCP[1]) && (baseGeo[2] == baseGCP[2]));
+  }
+};
 }  // namespace TranslateND
+
 namespace Affine2D {
 struct BBox {
   void add(double x, double y);
@@ -245,22 +294,54 @@ inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND:
 }
 
 template <int N>
-inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::TranslateGraph<N>& g) {
+inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::TranslateGraph<N>* g) {
   ofs << std::fixed << std::setprecision(15);
   ofs << "TranslateGraph " << N << '\n';
-  ofs << g.basepath << '\n';
-  ofs << g.baseID << '\n';
+  ofs << g->basepath << '\n';
+  ofs << g->baseID << '\n';
   for (int i = 0; i < N; ++i) {
     if (i > 0) ofs << ' ';
-    ofs << g.baseGeo[i];
+    ofs << g->baseGeo[i];
   }
   ofs << '\n';
-  ofs << g.nodes.size() << '\n';
-  for (size_t i = 0; i < g.nodes.size(); ++i) ofs << g.nodes[i];
-  ofs << g.edges.size() << '\n';
-  for (size_t i = 0; i < g.edges.size(); ++i) ofs << g.edges[i];
+  ofs << g->nodes.size() << '\n';
+  for (size_t i = 0; i < g->nodes.size(); ++i) ofs << g->nodes[i];
+  ofs << g->edges.size() << '\n';
+  for (size_t i = 0; i < g->edges.size(); ++i) ofs << g->edges[i];
   return ofs;
 }
+
+inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::GCPGraph::GCPPoint& p) {
+  ofs << p.name << '\n' << p.x << ',' << p.y << ',' << p.z << '\n';
+  ofs << p.ex << ',' << p.ey << ',' << p.ez << '\n';
+  return ofs;
+}
+
+inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::GCPGraph::GCPLink& l) {
+  ofs << l.gcpid << ',' << l.viewid << ',' << l.u << ',' << l.v << '\n';
+  ofs << l.dx << ',' << l.dy << ',' << l.dz << '\n';
+  ofs << l.ex << ',' << l.ey << ',' << l.ez << '\n';
+  return ofs;
+}
+
+inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::GCPGraph* g) {
+  ofs << std::fixed << std::setprecision(15);
+  ofs << "GCPGraph\n";
+  ofs << g->gcps.size() << '\n';
+  for (size_t i = 0; i < g->gcps.size(); ++i) ofs << g->gcps[i];
+  ofs << g->gcplinks.size() << '\n';
+  for (size_t i = 0; i < g->gcplinks.size(); ++i) ofs << g->gcplinks[i];
+  return ofs;
+}
+
+inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::TranslateGraph3WithGCP* g) {
+  ofs << "Translate3GraphWithGCP\n";
+  ofs << static_cast<const motionavg::TranslateND::TranslateGraph<3>*>(g);
+  ofs << static_cast<const motionavg::TranslateND::GCPGraph*>(g);
+  return ofs;
+}
+
+////
 
 template <int N>
 inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::Node<N>& n) {
@@ -280,7 +361,7 @@ inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::Edge<
 }
 
 template <int N>
-inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::TranslateGraph<N>& g) {
+inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::TranslateGraph<N>* g) {
   ifs.unsetf(std::ios_base::skipws);
   char dummy;
   std::string format_identifier;
@@ -288,15 +369,57 @@ inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::Trans
   ifs >> format_identifier >> dummy >> dim >> dummy;
   if (format_identifier != "TranslateGraph") return ifs;
   if (dim != N) return ifs;
-  ifs >> g.basepath >> dummy;
-  ifs >> g.baseID >> dummy;
-  for (int i = 0; i < N; ++i) ifs >> g.baseGeo[i] >> dummy;
+  ifs >> g->basepath >> dummy;
+  ifs >> g->baseID >> dummy;
+  for (int i = 0; i < N; ++i) ifs >> g->baseGeo[i] >> dummy;
   size_t num_nodes, num_edges;
   ifs >> num_nodes >> dummy;
-  g.nodes.resize(num_nodes);
-  for (int i = 0; i < num_nodes; ++i) ifs >> g.nodes[i];
+  g->nodes.resize(num_nodes);
+  for (int i = 0; i < num_nodes; ++i) ifs >> g->nodes[i];
   ifs >> num_edges >> dummy;
-  g.edges.resize(num_edges);
-  for (int i = 0; i < num_edges; ++i) ifs >> g.edges[i];
+  g->edges.resize(num_edges);
+  for (int i = 0; i < num_edges; ++i) ifs >> g->edges[i];
+  return ifs;
+}
+
+inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::GCPGraph::GCPPoint& p) {
+  char dummy;
+  ifs >> p.name >> dummy >> p.x >> dummy >> p.y >> dummy >> p.z >> dummy;
+  ifs >> p.ex >> dummy >> p.ey >> dummy >> p.ez >> dummy;
+  return ifs;
+}
+
+inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::GCPGraph::GCPLink& l) {
+  char dummy;
+  ifs >> l.gcpid >> dummy >> l.viewid >> dummy >> l.u >> dummy >> l.v >> dummy;
+  ifs >> l.dx >> dummy >> l.dy >> dummy >> l.dz >> dummy;
+  ifs >> l.ex >> dummy >> l.ey >> dummy >> l.ez >> dummy;
+  return ifs;
+}
+
+inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::GCPGraph* g) {
+  ifs.unsetf(std::ios_base::skipws);
+  char dummy;
+  std::string format_identifier;
+  ifs >> format_identifier >> dummy;
+  if (format_identifier != "GCPGraph") return ifs;
+  size_t num_gcps, num_links;
+  ifs >> num_gcps >> dummy;
+  g->gcps.resize(num_gcps);
+  for (int i = 0; i < num_gcps; ++i) ifs >> g->gcps[i];
+  ifs >> num_links >> dummy;
+  g->gcplinks.resize(num_links);
+  for (int i = 0; i < num_links; ++i) ifs >> g->gcplinks[i];
+  return ifs;
+}
+
+inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::TranslateGraph3WithGCP* g) {
+  ifs.unsetf(std::ios_base::skipws);
+  char dummy;
+  std::string format_identifier;
+  ifs >> format_identifier >> dummy;
+  if (format_identifier != "Translate3GraphWithGCP") return ifs;
+  ifs >> static_cast<motionavg::TranslateND::TranslateGraph<3>*>(g);
+  ifs >> static_cast<motionavg::TranslateND::GCPGraph*>(g);
   return ifs;
 }

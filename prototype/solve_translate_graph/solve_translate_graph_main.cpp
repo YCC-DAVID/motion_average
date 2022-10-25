@@ -17,16 +17,20 @@
 using namespace std;
 namespace logg = spdlog;
 using namespace motionavg::TranslateND;
-using GraphT = TranslateGraph<3>;
+using GraphT = TranslateGraph3WithGCP;
 
+constexpr double GCPWeightFactor = 1;
 GraphT solve_translate_MoAve_0_direct(const GraphT& g) {
   GraphT og = g;
 
   std::vector<std::vector<double>> NodePara;
   std::vector<std::vector<ConG_Unit>> Con_Graph;
+  std::vector<std::vector<UnaryG_Unit>> Unary_Graph;
 
   size_t n_node = g.nodes.size();
-  size_t n_edge = g.edges.size();
+  size_t n_pairedge = g.edges.size();
+  size_t n_gcpedge = g.gcplinks.size();
+  bool hasGCP = n_gcpedge > 0;
 
   NodePara.resize(n_node);
   for (size_t i = 0; i < n_node; ++i) {
@@ -36,8 +40,10 @@ GraphT solve_translate_MoAve_0_direct(const GraphT& g) {
   }
 
   Con_Graph.resize(n_node);
+  Unary_Graph.resize(n_node);
 
-  for (size_t i = 0; i < n_edge; ++i) {
+  // Add pairwise constraints
+  for (size_t i = 0; i < n_pairedge; ++i) {
     ConG_Unit u;
     const GraphT::Edge& e = g.edges[i];
     u.RefID = e.target;
@@ -58,11 +64,36 @@ GraphT solve_translate_MoAve_0_direct(const GraphT& g) {
     Con_Graph[e.target].push_back(u);
   }
 
+  // Add direct constraints to node
+  for (size_t i = 0; i < n_gcpedge; ++i) {
+    UnaryG_Unit u;
+    const GraphT::GCPLink& l = g.gcplinks[i];
+    const GraphT::GCPPoint& gcppt = g.gcps[l.gcpid];
+    u.RefID = l.viewid;
+    u.AbsParaVec.resize(3);
+    u.AbsParaVec[0] = gcppt.x - l.dx;
+    u.AbsParaVec[1] = gcppt.y - l.dy;
+    u.AbsParaVec[2] = gcppt.z - l.dz;
+
+    u.InvCovMatrix.resize(9);
+
+    Eigen::Matrix<double, 3, 3> stdMat;
+    stdMat.setZero();
+    stdMat(0, 0) = sqrt(std::pow(gcppt.ex, 2) + std::pow(l.ex, 2));
+    stdMat(1, 1) = sqrt(std::pow(gcppt.ey, 2) + std::pow(l.ey, 2));
+    stdMat(2, 2) = sqrt(std::pow(gcppt.ez, 2) + std::pow(l.ez, 2));
+    Eigen::Matrix<double, 3, 3> PMatSqrt = stdMat.inverse() * GCPWeightFactor;
+    std::copy_n(PMatSqrt.data(), 9, u.InvCovMatrix.data());
+
+    Unary_Graph[u.RefID].push_back(u);
+  }
+
   std::vector<int> RefNode;
-  RefNode.push_back(0);
+  if (!hasGCP) RefNode.push_back(0); // if GCP not appear, fix first frame to prevent rank deficiency
 
   MoAve_0 MA;
   MA.Initialize(NodePara, 3, Con_Graph);
+  MA.SetUnaryGraph(Unary_Graph);
   MA.Set_Reference_Nodes(RefNode);
   MA.Set_Max_Iter_Num(200);
   MA.Set_ConvergenceEpslon(1e-14);
@@ -134,7 +165,8 @@ GraphT solve_translate_MoAve_0_iter(const GraphT& g) {
 }
 
 void evaluate(GraphT& g, bool verbose) {
-  double error[3] = {0};
+  double pairwise_error[3] = {0};
+  spdlog::info("==== Evaluating Pairwise ====");
   for (int ei = 0; ei < g.edges.size(); ++ei) {
     GraphT::Edge& e = g.edges[ei];
     GraphT::Node& srcN = g.nodes[e.source];
@@ -143,7 +175,7 @@ void evaluate(GraphT& g, bool verbose) {
     double initXfm[3] = {tgtN.xfm[0] - srcN.xfm[0], tgtN.xfm[1] - srcN.xfm[1], tgtN.xfm[2] - srcN.xfm[2]};
 
     double diffXfm[3] = {std::abs(initXfm[0] - e.xfm[0]), std::abs(initXfm[1] - e.xfm[1]), std::abs(initXfm[2] - e.xfm[2])};
-    for (int i = 0; i < 3; ++i) error[i] += diffXfm[i];
+    for (int i = 0; i < 3; ++i) pairwise_error[i] += diffXfm[i];
     if (verbose) {
       string sname = fs::path(srcN.name).stem().string();
       string tname = fs::path(tgtN.name).stem().string();
@@ -153,11 +185,34 @@ void evaluate(GraphT& g, bool verbose) {
       spdlog::info("Diff: {} {} {} cm", diffXfm[0] * 100, diffXfm[1] * 100, diffXfm[2] * 100);
     }
   }
-  for (int i = 0; i < 3; ++i) error[i] /= g.edges.size();
-  spdlog::info("Error: {} {} {} cm", error[0] * 100, error[1] * 100, error[2] * 100);
+  for (int i = 0; i < 3; ++i) pairwise_error[i] /= g.edges.size();
+  spdlog::info("Mean Error: {} {} {} cm", pairwise_error[0] * 100, pairwise_error[1] * 100, pairwise_error[2] * 100);
+
+  spdlog::info("==== Evaluating GCP ====");
+  double gcp_error[3] = {0};
+  for (int ei=0;ei<g.gcplinks.size();++ei) {
+    GraphT::GCPLink& l = g.gcplinks[ei];
+    GraphT::Node& n = g.nodes[l.viewid];
+    GraphT::GCPPoint& gcppt = g.gcps[l.gcpid];
+
+    double initGCP[3] = {n.xfm[0] + l.dx, n.xfm[1] + l.dy, n.xfm[2] + l.dz};
+    double diffGCP[3] = {std::abs(initGCP[0] - gcppt.x), std::abs(initGCP[1] - gcppt.y), std::abs(initGCP[2] - gcppt.z)};
+    for (int i = 0; i < 3; ++i) gcp_error[i] += diffGCP[i];
+    if (verbose) {
+      string gcpname = gcppt.name;
+      string viewname = fs::path(n.name).stem().string();
+      spdlog::info("View {} and GCP {}", viewname, gcpname);
+      spdlog::debug("Init: {} {} {}", initGCP[0], initGCP[1], initGCP[2]);
+      spdlog::debug("Edge: {} {} {}", gcppt.x, gcppt.y, gcppt.z);
+      spdlog::info("Diff: {} {} {} cm", diffGCP[0] * 100, diffGCP[1] * 100, diffGCP[2] * 100);
+    }
+  }
+
+  for (int i = 0; i < 3; ++i) gcp_error[i] /= g.gcplinks.size();
+  spdlog::info("Mean Error: {} {} {} cm", gcp_error[0] * 100, gcp_error[1] * 100, gcp_error[2] * 100);
 }
 
-void normalize_graph(GraphT& g) {
+void graph_normalize_pairwise_cov(GraphT& g) {
   std::vector<double> covs;
   covs.reserve(g.edges.size());
   for (size_t i = 0; i < g.edges.size(); ++i) covs.push_back(g.edges[i].cov[0]);
@@ -220,15 +275,15 @@ int main(int argc, char** argv) {
   ifstream ifs(input_graph.string());
 
   GraphT g;
-  ifs >> g;
-  normalize_graph(g);
+  ifs >> &g;
+  graph_normalize_pairwise_cov(g);
 
   evaluate(g, false);
   g.rebase(0);
   GraphT direct = solve_translate_MoAve_0_direct(g);
   direct.rebase(-1);
   ofstream ofs(output_name.string());
-  ofs << direct;
+  ofs << &direct;
   ofs.close();
   evaluate(direct, false);
 

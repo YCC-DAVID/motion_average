@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -62,7 +63,6 @@ bool write_correspondence_offset_binary(const char* filename, float* data, unsig
   return true;
 }
 
-
 bool read_correspondence_offset_binary_num(const char* filename, unsigned int& numpts) {
   std::fstream fs(filename, std::ios::in | std::ios::binary);
   if (!fs.is_open()) {
@@ -104,6 +104,7 @@ cxxopts::Options parseOptions(std::string exepath = "") {
   options.add_options()
     ("i,input_folder", "input folder", cxxopts::value<std::string>())
 	("qinv2file", "qinv2 file", cxxopts::value<std::string>())
+    ("gcpfile", "gcp json file", cxxopts::value<std::string>()->default_value(""))
 	("o,output_name", "output filename", cxxopts::value<std::string>()->default_value("graph.txt"))
 	("minrays", "minimum num of rays", cxxopts::value<int>()->default_value("3"))
 	("minmatches", "minimum num of matches for valid pair", cxxopts::value<int>()->default_value("100"))
@@ -118,6 +119,7 @@ cxxopts::Options parseOptions(std::string exepath = "") {
   return options;
 }
 
+using GraphT = TranslateGraph3WithGCP;
 int main(int argc, char** argv) {
   GDALAllRegister();
 
@@ -134,9 +136,10 @@ int main(int argc, char** argv) {
     cout << options.help() << endl;
     return 0;
   }
-
+  bool hasGCP = args.count("gcpfile") > 0;
   fs::path rootdirpath(args["input_folder"].as<string>());
   fs::path qinv2path(args["qinv2file"].as<string>());
+  fs::path gcppath(args["gcpfile"].as<string>());
   fs::path outfilename(args["output_name"].as<string>()), outfilepath;
   int minimum_rays = args["minrays"].as<int>();
   bool preloadgrids = false;
@@ -148,9 +151,13 @@ int main(int argc, char** argv) {
   else
     outfilepath = rootdirpath / outfilename;
 
-  //
   if (!fs::exists(qinv2path)) {
     spdlog::critical("QinPose Not found: {}", qinv2path.string());
+    return 1;
+  }
+
+  if (hasGCP && !fs::exists(gcppath)) {
+    spdlog::critical("GCP file Not Found: {}", gcppath.string());
     return 1;
   }
 
@@ -163,7 +170,7 @@ int main(int argc, char** argv) {
   }
 
   // Build graph
-  using GraphT = TranslateGraph<3>;
+  // using GraphT = TranslateGraph<3>;
   GraphT g;
   g.basepath = rootdirpath.string();
   g.baseID = -1;
@@ -184,24 +191,95 @@ int main(int argc, char** argv) {
     n.xfm[2] = poses[i].z;
     g.insertNode(n);
   }
+  
+  if (hasGCP) {
+    ifstream ifs;
+    // Add GCP
+    using json = nlohmann::json;
+    ifs.open(gcppath.string());
+    json gcpfilejson = json::parse(ifs);
+    json gcpjson = gcpfilejson["GCP"];
+    for (auto& [gcpname, gcpval] : gcpjson.items()) {
+      GCPGraph::GCPPoint gcppt;
+      gcppt.name = gcpname;
+      gcppt.x = gcpval["x"].get<double>();
+      gcppt.y = gcpval["y"].get<double>();
+      gcppt.z = gcpval["z"].get<double>();
 
+      gcppt.ex = gcpval.value("ex", 999.f);
+      gcppt.ey = gcpval.value("ey", 999.f);
+      gcppt.ez = gcpval.value("ez", 999.f);
+
+      int gcpid = g.gcps.size();
+      g.gcps.push_back(gcppt);
+
+      for (auto& [key, view] : gcpval["views"].items()) {
+        // find viewid
+        std::string viewname = key;
+        auto nodeit = std::find_if(g.nodes.begin(), g.nodes.end(), [&viewname](const GraphT::Node& n) { return viewname == n.name; });
+        int viewid = std::distance(g.nodes.begin(), nodeit);
+        GCPGraph::GCPLink gcplink;
+        gcplink.gcpid = gcpid;
+        gcplink.viewid = viewid;
+        gcplink.u = view["u"].get<double>();
+        gcplink.v = view["v"].get<double>();
+        g.gcplinks.push_back(gcplink);
+      }
+    }
+
+    // Read GCP constraints
+    for (auto& l : g.gcplinks) {
+      auto& view = g.nodes[l.viewid];
+      auto& gcppt = g.gcps[l.gcpid];
+
+      string viewName = fs::path(view.name).stem().string();
+
+      // clang-format off
+      fs::path viewgridpath[3] = {
+        tempfolderdirpath / viewName / fmt::format("{}_Xgrid.tif", viewName),
+        tempfolderdirpath / viewName / fmt::format("{}_Ygrid.tif", viewName),
+        tempfolderdirpath / viewName / fmt::format("{}_Zgrid.tif", viewName)};
+      // clang-format on
+      XYZGrid viewXYZ(false);
+      viewXYZ.open(viewgridpath, fs::path());
+      
+      uint16_t dummy;
+      viewXYZ.sample(l.u, l.v, l.dx, l.dy, l.dz, dummy);
+      // TODO: The erro could be derived from grids and correspondences.
+      l.ex = 0.01;
+      l.ey = 0.01;
+      l.ez = 0.01;
+      double viewX = l.dx + view.xfm[0];
+      double viewY = l.dy + view.xfm[1];
+      double viewZ = l.dz + view.xfm[2];
+
+      spdlog::trace("GCP[{}]-View[{}]: {} {} {}", gcppt.name, view.name, viewX - gcppt.x, viewY - gcppt.y, viewZ - gcppt.z);
+    }
+  }
+  
   // Add Edges
-  ifstream ifs;
-  ifs.open(Neighborhood_file_path.string(), ios::binary);
   int numimg, maxpair;
-  ifs.read(reinterpret_cast<char*>(&numimg), sizeof(int));
-  ifs.read(reinterpret_cast<char*>(&maxpair), sizeof(int));
-  spdlog::debug("neighbor bin: {} {}", numimg, maxpair);
+  std::vector<int> neighborbin;
+  {
+    ifstream ifs;
+    ifs.open(Neighborhood_file_path.string(), ios::binary);
+    ifs.read(reinterpret_cast<char*>(&numimg), sizeof(int));
+    ifs.read(reinterpret_cast<char*>(&maxpair), sizeof(int));
+    spdlog::debug("neighbor bin: {} {}", numimg, maxpair);
+    neighborbin.resize(numimg * (maxpair + 1));
+    ifs.read(reinterpret_cast<char*>(neighborbin.data()), numimg * (maxpair + 1) * sizeof(int));
+    ifs.close();
+  }
+
   for (int i = 0; i < numimg; ++i)  // i-th image
   {
-    int* ids = new int[maxpair + 1];
-    ifs.read(reinterpret_cast<char*>(ids), (maxpair + 1) * sizeof(int));
+    const int* ids = &neighborbin[i * (maxpair + 1)];
     spdlog::trace("{}: {}", i, fmt::join(ids + 1, ids + maxpair + 1, ", "));
 
     int srcId = i;
     string srcName = fs::path(g.nodes[srcId].name).stem().string();
 
-    //if (srcName != "029_065_id3188c81615_124544_Backward") continue;
+    // if (srcName != "029_065_id3188c81615_124544_Backward") continue;
 
     // clang-format off
     fs::path srcgridpath[3] = {
@@ -224,7 +302,7 @@ int main(int argc, char** argv) {
     XYZGrid srcXYZ(true);
     srcXYZ.open(srcgridpath, srcraynumpath);
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int j = 1; j < maxpair + 1; ++j)  // j-th neighbor
     {
       if (ids[j] == -1) continue;
@@ -318,15 +396,14 @@ int main(int argc, char** argv) {
         bool valid00 = srcTmpXYZ.sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], srcTmpNumRay);
         if (!valid00) continue;
 
-        
-        
-        if (srcNumRay < minimum_rays || tgtNumRay < minimum_rays) continue;
+        if (srcNumRay < minimum_rays || tgtNumRay < minimum_rays)
+          continue;
         else {
           ++numMatch;
           float _weight = std::pow(srcTmpMatch[0] - srcMatch[0], 2) + std::pow(srcTmpMatch[1] - srcMatch[1], 2) + std::pow(srcTmpMatch[2] - srcMatch[2], 2);
           _weight = std::exp(-invsigmasq_2 * _weight);
           totalWeight += _weight;
-          
+
           offset_n_weight.get()[4 * k + 0] = srcMatch[0] - tgtMatch[0];
           offset_n_weight.get()[4 * k + 1] = srcMatch[1] - tgtMatch[1];
           offset_n_weight.get()[4 * k + 2] = srcMatch[2] - tgtMatch[2];
@@ -335,8 +412,8 @@ int main(int argc, char** argv) {
           double _distsq = 0;
 #endif
           for (int _d = 0; _d < 3; ++_d) {
-            meanSrc[_d] += _weight*srcMatch[_d];
-            meanTgt[_d] += _weight*tgtMatch[_d];
+            meanSrc[_d] += _weight * srcMatch[_d];
+            meanTgt[_d] += _weight * tgtMatch[_d];
 #if FIND_MEDIAN
             offset[_d].emplace_back(srcMatch[_d] - tgtMatch[_d]);
             _distsq += std::pow(srcMatch[_d] - tgtMatch[_d], 2);
@@ -384,18 +461,17 @@ int main(int argc, char** argv) {
       spdlog::trace("Edge: {} {} {}", e.xfm[0], e.xfm[1], e.xfm[2]);
       spdlog::debug("Diff: {} {} {} cm {}, {}, {}", diffXfm[0] * 100, diffXfm[1] * 100, diffXfm[2] * 100, srcName, tgtName, totalWeight);
 
-      #pragma omp critical
+#pragma omp critical
       g.insertEdge(e);
 
       write_correspondence_offset_binary(correspondenceoffsetbin.string().c_str(), offset_n_weight.get(), numpts);
     }
-    delete[] ids;
   }
-  ifs.close();
 
   ofstream ofs(outfilepath.string());
-  ofs << g;
+  ofs << &g;
   ofs.close();
+  spdlog::info("Done");
 
   return 0;
 }

@@ -151,7 +151,7 @@
       <SubSystem>
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>common.lib;$(ConanSystemDeps)%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>common.lib;$(ConanSystemDeps)%(AdditionalDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
