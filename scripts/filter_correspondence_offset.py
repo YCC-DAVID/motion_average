@@ -24,7 +24,7 @@ def parseArgs():
   parser.add_argument("input_graph_pri", type=str, help="input prior graph")
   parser.add_argument("input_graph_post", type=str, help="input posterior graph")
   parser.add_argument("--imgdir", type=str, help="img dir")
-  
+  parser.add_argument("--force", dest='force', action='store_true')
   args = parser.parse_args()
   return args
 
@@ -36,6 +36,7 @@ if __name__ == '__main__':
   input_graph_post = args.input_graph_post
   imgdir = args.imgdir
   bPlotImage = imgdir is not None
+  force = args.force
 
   # pri_graph = TranslateGraph()
   post_graph = TranslateGraph()
@@ -60,9 +61,9 @@ if __name__ == '__main__':
     print(f'Edge {ei}: {srcId},{tgtId} {srcName}, {tgtName}')
 
     correspondence_pix_path = osp.join(tempdir, srcName, f'{srcName}_{tgtName}_correspondence_pix.bin')
+    correspondence_offset_path = osp.join(tempdir, srcName, f'{srcName}_{tgtName}_correspondence_offset.bin')
     out_weight_filtered_path = osp.join(tempdir, srcName, f'{srcName}_{tgtName}_correspondence_pix.weight.bin')
     out_posterior_filtered_path = osp.join(tempdir, srcName, f'{srcName}_{tgtName}_correspondence_pix.graphopt.bin')
-    correspondence_offset_path = osp.join(tempdir, srcName, f'{srcName}_{tgtName}_correspondence_offset.bin')
 
     with open(correspondence_pix_path,'rb') as f:
       data = f.read()
@@ -80,7 +81,7 @@ if __name__ == '__main__':
       validmask = weights>0
       assert(not np.isinf(offset[validmask,:]).any())
     # Approach #1: Inlier by comparing MedianFilterGrid vs TempGrid
-    if not osp.exists(out_weight_filtered_path):
+    if not osp.exists(out_weight_filtered_path) or force:
       w_hist, w_edges = np.histogram(weights[validmask],bins=512)
       w_cdf = np.cumsum(w_hist) / w_hist.sum()
       w_threshold = w_edges[np.searchsorted(w_cdf,0.3)]
@@ -94,7 +95,7 @@ if __name__ == '__main__':
         f.write(encdata.tobytes())
         
     # Approach #2:
-    if not osp.exists(out_posterior_filtered_path):
+    if not osp.exists(out_posterior_filtered_path) or force:
       # Get statistic from measurement
       observed_mean = np.average(offset[validmask,:], axis=0, weights=weights[validmask])
       observed_cov = np.cov(offset[validmask,:], rowvar=False, aweights = weights[validmask])

@@ -31,7 +31,9 @@ class TranslateGraph:
         f.close()
 
         ptr = 0
-        if lines[ptr] != 'TranslateGraph 3':
+        if lines[ptr] == 'Translate3GraphWithGCP':
+            ptr +=1
+        elif lines[ptr] != 'TranslateGraph 3':
             print(f"Error, unknown line type {lines[ptr]}")
         ptr += 1
         self.basepath = lines[ptr]

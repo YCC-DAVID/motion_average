@@ -19,14 +19,15 @@ struct QinPose {
 
   Eigen::Matrix3d GetK() const {
     Eigen::Matrix3d K;
-    K << f, 0, double(width - 1) / 2.0 + cx, 0, f, double(height - 1) / 2.0 + cy, 0, 0, 1;
+    K << f, 0, double(width) / 2.0 + cx, 0, f, double(height) / 2.0 - cy, 0, 0, 1;
     return K;
   }
 
   void SetK(const Eigen::Matrix3d &K) {
+      // Qin file use x-> right y->up convension
     f = K(0, 0);
-    cx = K(0, 2) - double(width - 1) / 2.0;
-    cy = K(1, 2) - double(height - 1) / 2.0;
+    cx = K(0, 2) - double(width) / 2.0;
+    cy = -K(1, 2) + double(height) / 2.0;
   }
 
   /**

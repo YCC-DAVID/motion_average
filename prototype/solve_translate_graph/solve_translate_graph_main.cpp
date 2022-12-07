@@ -19,7 +19,7 @@ namespace logg = spdlog;
 using namespace motionavg::TranslateND;
 using GraphT = TranslateGraph3WithGCP;
 
-constexpr double GCPWeightFactor = 1;
+constexpr double GCPWeightFactor = 0.05;
 GraphT solve_translate_MoAve_0_direct(const GraphT& g) {
   GraphT og = g;
 
