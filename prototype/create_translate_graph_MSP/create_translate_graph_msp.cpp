@@ -1,4 +1,4 @@
-#include <omp.h>
+// #include <omp.h>
 #include <spdlog/spdlog.h>
 
 #include <Eigen/Dense>
@@ -44,7 +44,7 @@ bool read_correspondence_pts_pix_binary(const char* filename, float* datapointer
 
   unsigned int numpt;
   fs.read((char*)&numpt, sizeof(unsigned int));
-  fs.read((char*)datapointerout, sizeof(float) * numpt * 4);
+  fs.read((char*)datapointerout, sizeof(float) * numpt * 7);
   fs.close();
 
   return true;
@@ -119,11 +119,191 @@ cxxopts::Options parseOptions(std::string exepath = "") {
   return options;
 }
 
+float INVALID_VALUE = std::numeric_limits<float>::infinity();
+
+
+
+bool create_edge_minimize_reproject_error(const XYZGrid* srcXYZ, const XYZGrid* srcTmpXYZ, const XYZGrid* tgtTmpXYZ, const XYZGrid* tgtXYZ,
+    const QinPose& srcPose, const QinPose& tgtPose,
+    const float* matches, int numpts, float* offset_n_weight,
+    int minimum_rays, float invsigmasq_2, int minimum_matches, double* xfm, double* cov) {
+
+    auto srcK = srcPose.GetK();
+    auto srcR = srcPose.GetR();
+    auto srcC = srcPose.GetC();
+    auto tgtK = tgtPose.GetK();
+    auto tgtR = tgtPose.GetR();
+    auto tgtC = tgtPose.GetC();
+  
+    Eigen::Vector3d init_bij = -srcC + tgtC;
+    Eigen::Vector3d expected_bij{0, 0, 0};
+    int num_measure = 0;
+    float totalWeight = 0;
+    for (int k = 0; k < numpts; k += 1)  // k-th matched points
+    {
+      std::fill_n(offset_n_weight + 4 * k, 3, INVALID_VALUE);
+      offset_n_weight[4 * k + 3] = 0;
+      const float& srcX = matches[7 * k + 0];
+      const float& srcY = matches[7 * k + 1];
+      const float& tgtX = matches[7 * k + 2];
+      const float& tgtY = matches[7 * k + 3];
+
+      float srcMatch[3];
+      //float srcTmpMatch[3];
+      //float tgtMatch[3];
+      //float tgtTmpMatch[3];
+      uint16_t srcNumRay;
+      //uint16_t srcTmpNumRay;
+      //uint16_t tgtNumRay;
+      //uint16_t tgtTmpNumRay;
+      bool valid0 = srcXYZ->sample(srcX, srcY, srcMatch[0], srcMatch[1], srcMatch[2], srcNumRay);
+      if (!valid0) continue;
+      /*bool valid1 = tgtXYZ->sample(tgtX, tgtY, tgtMatch[0], tgtMatch[1], tgtMatch[2], tgtNumRay);
+      if (!valid1) continue;*/
+      /*bool valid00 = srcTmpXYZ->sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], srcTmpNumRay);
+      if (!valid00) continue;*/
+
+      if (srcNumRay < minimum_rays 
+          //|| tgtNumRay < minimum_rays
+          )
+        continue;
+      else {
+        Eigen::Vector3d init_bij = -srcC + tgtC;
+        Eigen::Vector3d objpt_src = Eigen::Vector3d(srcMatch[0], srcMatch[1], srcMatch[2]);
+        //Eigen::Vector3d objpt_tgt = Eigen::Vector3d(tgtMatch[0], tgtMatch[1], tgtMatch[2]);
+        //Eigen::Vector3d campt_tgt2tgt = tgtR * objpt_tgt;
+        //Eigen::Vector3d campt_tmptgt = tgtR * Eigen::Vector3d(tgtTmpMatch[0], tgtTmpMatch[1], tgtTmpMatch[2]);
+        Eigen::Vector3d campt_src2tgt = tgtR * (srcC + objpt_src - tgtC);
+        //Eigen::Vector3d campt_srctmp2tgt = tgtR * (srcC + Eigen::Vector3d(srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2]) - tgtC);
+        //double depth_tgt2tgt = campt_tgt2tgt[2];
+        double depth_src2tgt = campt_src2tgt[2];
+        //Eigen::Vector3d imgpt_tgt2tgt = tgtK * campt_tgt2tgt / depth_tgt2tgt;
+        Eigen::Vector3d imgpt_src2tgt = tgtK * campt_src2tgt / depth_src2tgt;
+        
+        Eigen::Vector3d _bij = objpt_src - tgtR.transpose() * tgtK.inverse() * Eigen::Vector3d{depth_src2tgt * tgtX, depth_src2tgt * tgtY, depth_src2tgt};
+
+        if (num_measure == 0) {
+          expected_bij = _bij;
+        } else {
+          expected_bij += (_bij - expected_bij) / (num_measure + 1);
+        }
+        
+        ++num_measure;
+      }
+    }
+
+    if (num_measure < minimum_matches) return false;
+    bool valid = true;
+
+    totalWeight = num_measure;
+    for (int _d = 0; _d < 3; ++_d) {
+      xfm[_d] = expected_bij[_d];
+      cov[4 * _d] = 1. / totalWeight;
+      if (std::isnan(xfm[_d]) || std::isinf(xfm[_d])) valid = false;
+    }
+
+    return valid;
+}
+
+bool create_edge_minimize_object_points(const XYZGrid* srcXYZ, const XYZGrid* srcTmpXYZ, 
+    const XYZGrid* tgtTmpXYZ, const XYZGrid* tgtXYZ, const float* matches, int numpts, 
+    float* offset_n_weight,int minimum_rays, float invsigmasq_2, int minimum_matches,
+    double* xfm, double*cov) {
+
+  double meanSrc[3] = {0}, meanTgt[3] = {0};
+#if FIND_MEDIAN
+  std::vector<float> offset[3], offDist;
+  offset[0].reserve(numpts);
+  offset[1].reserve(numpts);
+  offset[2].reserve(numpts);
+  offDist.reserve(numpts);
+#endif
+
+  int numMatch = 0;
+  float totalWeight = 0;
+  for (int k = 0; k < numpts; k += 1)  // k-th matched points
+  {
+    std::fill_n(offset_n_weight + 4 * k, 3, INVALID_VALUE);
+    offset_n_weight[4 * k + 3] = 0;
+    const float& srcX = matches[4 * k + 0];
+    const float& srcY = matches[4 * k + 1];
+    const float& tgtX = matches[4 * k + 2];
+    const float& tgtY = matches[4 * k + 3];
+
+    float srcMatch[3], srcTmpMatch[3], tgtMatch[3];
+    uint16_t srcNumRay, srcTmpNumRay, tgtNumRay;
+    bool valid0 = srcXYZ->sample(srcX, srcY, srcMatch[0], srcMatch[1], srcMatch[2], srcNumRay);
+    if (!valid0) continue;
+    bool valid1 = tgtXYZ->sample(tgtX, tgtY, tgtMatch[0], tgtMatch[1], tgtMatch[2], tgtNumRay);
+    if (!valid1) continue;
+    bool valid00 = srcTmpXYZ->sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], srcTmpNumRay);
+    if (!valid00) continue;
+
+    if (srcNumRay < minimum_rays || tgtNumRay < minimum_rays)
+      continue;
+    else {
+      ++numMatch;
+      float _weight = std::pow(srcTmpMatch[0] - srcMatch[0], 2) + std::pow(srcTmpMatch[1] - srcMatch[1], 2) + std::pow(srcTmpMatch[2] - srcMatch[2], 2);
+      _weight = std::exp(-invsigmasq_2 * _weight);
+      totalWeight += _weight;
+
+      offset_n_weight[4 * k + 0] = srcMatch[0] - tgtMatch[0];
+      offset_n_weight[4 * k + 1] = srcMatch[1] - tgtMatch[1];
+      offset_n_weight[4 * k + 2] = srcMatch[2] - tgtMatch[2];
+      offset_n_weight[4 * k + 3] = _weight;
+#if FIND_MEDIAN
+      double _distsq = 0;
+#endif
+      for (int _d = 0; _d < 3; ++_d) {
+        meanSrc[_d] += _weight * srcMatch[_d];
+        meanTgt[_d] += _weight * tgtMatch[_d];
+#if FIND_MEDIAN
+        offset[_d].emplace_back(srcMatch[_d] - tgtMatch[_d]);
+        _distsq += std::pow(srcMatch[_d] - tgtMatch[_d], 2);
+      }
+      offDist.emplace_back(_distsq);
+#else
+      }
+#endif
+    }
+  }
+
+  if (numMatch < minimum_matches) return false;
+  bool valid = true;
+
+#if FIND_MEDIAN
+  // find median value
+  std::vector<float> offDistCopy = offDist;
+  auto middle = offDistCopy.begin() + (offDistCopy.size() / 2);
+  std::nth_element(offDistCopy.begin(), middle, offDistCopy.end());
+  float nthvalue = *middle;
+  auto it = std::find(offDist.begin(), offDist.end(), nthvalue);
+  auto pos = std::distance(offDist.begin(), it);
+
+  double medianXfm[3] = {offset[0][pos], offset[1][pos], offset[2][pos]};
+
+  spdlog::trace("Median: {} {} {}", medianXfm[0], medianXfm[1], medianXfm[2]);
+#endif
+  // compute mean value
+  for (int _d = 0; _d < 3; ++_d) {
+    meanSrc[_d] /= totalWeight;
+    meanTgt[_d] /= totalWeight;
+    xfm[_d] = meanSrc[_d] - meanTgt[_d];
+    cov[4 * _d] = 1. / totalWeight;
+    if (std::isnan(xfm[_d]) || std::isinf(xfm[_d])) valid = false;
+  }
+#if FIND_MEDIAN
+  spdlog::trace("Mean: {} {} {}", meanSrc[0] - meanTgt[0], meanSrc[1] - meanTgt[1], meanSrc[2] - meanTgt[2]);
+#endif
+  if (!valid) return false;
+
+  return true;
+}
+
 using GraphT = TranslateGraph3WithGCP;
 int main(int argc, char** argv) {
   GDALAllRegister();
 
-  float INVALID_VALUE = std::numeric_limits<float>::infinity();
   cxxopts::Options options = parseOptions(argv[0]);
   cxxopts::ParseResult args = options.parse(argc, argv);
   spdlog::set_level(static_cast<logg::level::level_enum>(args["verbose"].as<int>()));
@@ -325,8 +505,8 @@ int main(int argc, char** argv) {
       read_correspondence_pts_pix_binary_num(correspondencepixbin.string().c_str(), numpts);
       spdlog::trace("numpts {}", numpts);
       if (numpts < minimum_matches) continue;
-      std::unique_ptr<float> matches(new float[4 * numpts]);
-      std::unique_ptr<float> offset_n_weight(new float[4 * numpts]);
+      std::unique_ptr<float> matches(new float[7 * numpts]);
+      std::unique_ptr<float> offset_n_weight(new float[7 * numpts]);
       read_correspondence_pts_pix_binary(correspondencepixbin.string().c_str(), matches.get());
 
       spdlog::trace("src {} tgt {}", srcName, tgtName);
@@ -346,6 +526,13 @@ int main(int argc, char** argv) {
           tempfolderdirpath / srcName / fmt::format("{}_{}_temgridZ.tif", srcName, tgtName)};
       // clang-format on
 
+      // clang-format off
+      fs::path tgttempgridpath[3] = {
+          tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridX.tif", tgtName, srcName),
+          tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridY.tif", tgtName, srcName),
+          tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridZ.tif", tgtName, srcName)};
+      // clang-format on
+
       for (int _d = 0; _d < 3; ++_d)
         if (!fs::exists(tgtgridpath[_d])) {
           spdlog::error("File Not Found: {}", tgtgridpath[_d].string());
@@ -361,110 +548,39 @@ int main(int argc, char** argv) {
           spdlog::error("File Not Found: {}", srctempgridpath[_d].string());
           continue;
         }
-
+      //for (int _d = 0; _d < 3; ++_d)
+      //  if (!fs::exists(tgttempgridpath[_d])) {
+      //    spdlog::error("File Not Found: {}", tgttempgridpath[_d].string());
+      //    continue;
+      //  }
       XYZGrid srcTmpXYZ(preloadgrids);
       srcTmpXYZ.open(srctempgridpath, fs::path());
+      //XYZGrid tgtTmpXYZ(preloadgrids);
+      //tgtTmpXYZ.open(tgttempgridpath, fs::path());
       XYZGrid tgtXYZ(preloadgrids);
       tgtXYZ.open(tgtgridpath, tgtraynumpath);
 
-      double meanSrc[3] = {0}, meanTgt[3] = {0};
-#if FIND_MEDIAN
-      std::vector<float> offset[3], offDist;
-      offset[0].reserve(numpts);
-      offset[1].reserve(numpts);
-      offset[2].reserve(numpts);
-      offDist.reserve(numpts);
-#endif
 
-      int numMatch = 0;
-      float totalWeight = 0;
-      for (int k = 0; k < numpts; k += 1)  // k-th matched points
-      {
-        std::fill_n(offset_n_weight.get() + 4 * k, 3, INVALID_VALUE);
-        offset_n_weight.get()[4 * k + 3] = 0;
-        float& srcX = matches.get()[4 * k + 0];
-        float& srcY = matches.get()[4 * k + 1];
-        float& tgtX = matches.get()[4 * k + 2];
-        float& tgtY = matches.get()[4 * k + 3];
+      //bool valid = create_edge_minimize_object_points(&srcXYZ, &srcTmpXYZ, nullptr, &tgtXYZ, 
+      //    matches.get(), numpts, offset_n_weight.get(), minimum_rays, invsigmasq_2, minimum_matches, e.xfm, e.cov);
 
-        float srcMatch[3], srcTmpMatch[3], tgtMatch[3];
-        uint16_t srcNumRay, srcTmpNumRay, tgtNumRay;
-        bool valid0 = srcXYZ.sample(srcX, srcY, srcMatch[0], srcMatch[1], srcMatch[2], srcNumRay);
-        if (!valid0) continue;
-        bool valid1 = tgtXYZ.sample(tgtX, tgtY, tgtMatch[0], tgtMatch[1], tgtMatch[2], tgtNumRay);
-        if (!valid1) continue;
-        bool valid00 = srcTmpXYZ.sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], srcTmpNumRay);
-        if (!valid00) continue;
+      bool valid = create_edge_minimize_reproject_error(&srcXYZ, &srcTmpXYZ, nullptr, &tgtXYZ, poses[srcId], poses[tgtId], matches.get(), numpts, offset_n_weight.get(), minimum_rays, invsigmasq_2,
+                                                        minimum_matches, e.xfm, e.cov);
+      
 
-        if (srcNumRay < minimum_rays || tgtNumRay < minimum_rays)
-          continue;
-        else {
-          ++numMatch;
-          float _weight = std::pow(srcTmpMatch[0] - srcMatch[0], 2) + std::pow(srcTmpMatch[1] - srcMatch[1], 2) + std::pow(srcTmpMatch[2] - srcMatch[2], 2);
-          _weight = std::exp(-invsigmasq_2 * _weight);
-          totalWeight += _weight;
-
-          offset_n_weight.get()[4 * k + 0] = srcMatch[0] - tgtMatch[0];
-          offset_n_weight.get()[4 * k + 1] = srcMatch[1] - tgtMatch[1];
-          offset_n_weight.get()[4 * k + 2] = srcMatch[2] - tgtMatch[2];
-          offset_n_weight.get()[4 * k + 3] = _weight;
-#if FIND_MEDIAN
-          double _distsq = 0;
-#endif
-          for (int _d = 0; _d < 3; ++_d) {
-            meanSrc[_d] += _weight * srcMatch[_d];
-            meanTgt[_d] += _weight * tgtMatch[_d];
-#if FIND_MEDIAN
-            offset[_d].emplace_back(srcMatch[_d] - tgtMatch[_d]);
-            _distsq += std::pow(srcMatch[_d] - tgtMatch[_d], 2);
-          }
-          offDist.emplace_back(_distsq);
-#else
-          }
-#endif
-        }
-      }
-
-      if (numMatch < minimum_matches) continue;
-      bool valid = true;
-
-#if FIND_MEDIAN
-      // find median value
-      std::vector<float> offDistCopy = offDist;
-      auto middle = offDistCopy.begin() + (offDistCopy.size() / 2);
-      std::nth_element(offDistCopy.begin(), middle, offDistCopy.end());
-      float nthvalue = *middle;
-      auto it = std::find(offDist.begin(), offDist.end(), nthvalue);
-      auto pos = std::distance(offDist.begin(), it);
-
-      double medianXfm[3] = {offset[0][pos], offset[1][pos], offset[2][pos]};
-
-      spdlog::trace("Median: {} {} {}", medianXfm[0], medianXfm[1], medianXfm[2]);
-#endif
-      // compute mean value
-      for (int _d = 0; _d < 3; ++_d) {
-        meanSrc[_d] /= totalWeight;
-        meanTgt[_d] /= totalWeight;
-        e.xfm[_d] = meanSrc[_d] - meanTgt[_d];
-        e.cov[4 * _d] = 1. / totalWeight;
-        if (std::isnan(e.xfm[_d]) || std::isinf(e.xfm[_d])) valid = false;
-      }
-#if FIND_MEDIAN
-      spdlog::trace("Mean: {} {} {}", meanSrc[0] - meanTgt[0], meanSrc[1] - meanTgt[1], meanSrc[2] - meanTgt[2]);
-#endif
       if (!valid) continue;
-
+      
       double initXfm[3] = {g.nodes[tgtId].xfm[0] - g.nodes[srcId].xfm[0], g.nodes[tgtId].xfm[1] - g.nodes[srcId].xfm[1], g.nodes[tgtId].xfm[2] - g.nodes[srcId].xfm[2]};
 
       double diffXfm[3] = {std::abs(initXfm[0] - e.xfm[0]), std::abs(initXfm[1] - e.xfm[1]), std::abs(initXfm[2] - e.xfm[2])};
       spdlog::trace("Init: {} {} {}", initXfm[0], initXfm[1], initXfm[2]);
       spdlog::trace("Edge: {} {} {}", e.xfm[0], e.xfm[1], e.xfm[2]);
-      spdlog::debug("Diff: {} {} {} cm {}, {}, {}", diffXfm[0] * 100, diffXfm[1] * 100, diffXfm[2] * 100, srcName, tgtName, totalWeight);
-
+      spdlog::debug("Diff: {} {} {} cm {}, {}", diffXfm[0] * 100, diffXfm[1] * 100, diffXfm[2] * 100, srcName, tgtName);
 #pragma omp critical
       g.insertEdge(e);
 
-      write_correspondence_offset_binary(correspondenceoffsetbin.string().c_str(), offset_n_weight.get(), numpts);
+      //write_correspondence_offset_binary(correspondenceoffsetbin.string().c_str(), offset_n_weight.get(), numpts);
+      break;
     }
   }
 
