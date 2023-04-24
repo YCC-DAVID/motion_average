@@ -122,9 +122,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{252F
 	ProjectSection(SolutionItems) = preProject
 		scripts\Additive_Affine2withPrior.py = scripts\Additive_Affine2withPrior.py
 		scripts\analysis_itersolver.py = scripts\analysis_itersolver.py
+		scripts\evaluate_biasaverage.py = scripts\evaluate_biasaverage.py
 		scripts\filter_correspondence_offset.py = scripts\filter_correspondence_offset.py
+		scripts\main.py = scripts\main.py
+		scripts\plot_match.py = scripts\plot_match.py
 		scripts\plot_trans3d_graph.py = scripts\plot_trans3d_graph.py
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "evaluate_MSP_densecorr", "prototype\evaluate_MSP_densecorr\evaluate_MSP_densecorr.vcxproj", "{D20356A0-631B-4D83-B0D2-661A40632607}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -302,6 +307,14 @@ Global
 		{407F45F5-12F2-44CD-8688-1368A1D716A0}.Release|x64.Build.0 = Release|x64
 		{407F45F5-12F2-44CD-8688-1368A1D716A0}.Release|x86.ActiveCfg = Release|Win32
 		{407F45F5-12F2-44CD-8688-1368A1D716A0}.Release|x86.Build.0 = Release|Win32
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Debug|x64.ActiveCfg = Debug|x64
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Debug|x64.Build.0 = Debug|x64
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Debug|x86.ActiveCfg = Debug|Win32
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Debug|x86.Build.0 = Debug|Win32
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Release|x64.ActiveCfg = Release|x64
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Release|x64.Build.0 = Release|x64
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Release|x86.ActiveCfg = Release|Win32
+		{D20356A0-631B-4D83-B0D2-661A40632607}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -330,6 +343,7 @@ Global
 		{39A9E2DA-C665-4CA8-9B52-CB718E6F328E} = {81729E3B-4684-446A-A086-D80F2E9E40CC}
 		{27601DA0-19F4-4AB4-BD4D-1A512AA2C23D} = {665657F8-AA83-47F2-BF66-267AA6F11E8E}
 		{407F45F5-12F2-44CD-8688-1368A1D716A0} = {665657F8-AA83-47F2-BF66-267AA6F11E8E}
+		{D20356A0-631B-4D83-B0D2-661A40632607} = {665657F8-AA83-47F2-BF66-267AA6F11E8E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3AE5A347-1A24-4D1D-906E-20B0B99C650E}

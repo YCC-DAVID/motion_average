@@ -10,8 +10,8 @@ struct QinPose {
   double f;
   double cx;
   double cy;
-  int pxsz_x = 1;
-  int pxsz_y = 1;
+  double pxsz_x = 1;
+  double pxsz_y = 1;
   int width;
   int height;
   double x, y, z;

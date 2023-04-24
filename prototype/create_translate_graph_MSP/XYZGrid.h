@@ -5,13 +5,14 @@
 #include <vector>
 
 #include <filesystem>
+
 class XYZGrid {
  public:
   XYZGrid(bool _preload);
   ~XYZGrid();
 
   bool open(const std::filesystem::path gridpath[3], const std::filesystem::path raynumpath);
-  bool sample(const float& px, const float& py, float& sx, float& sy, float& sz, uint16_t& nray) const;
+  bool sample(const float px, const float py, float& sx, float& sy, float& sz, uint16_t& nray) const;
 
   GDALDatasetH ds[4];
   GDALRasterBandH bd[4];

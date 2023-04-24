@@ -53,7 +53,7 @@ bool XYZGrid::open(const fs::path gridpath[3], const fs::path raynumpath) {
   return inited;
 }
 
-  bool XYZGrid::sample(const float& px, const float& py, float& sx, float& sy, float& sz, uint16_t& nray) const {
+  bool XYZGrid::sample(const float px, const float py, float& sx, float& sy, float& sz, uint16_t& nray) const {
   float* res[3] = {&sx, &sy, &sz};
   bool valid = true;
   if (preload) {
@@ -78,18 +78,17 @@ bool XYZGrid::open(const fs::path gridpath[3], const fs::path raynumpath) {
       *res[_d] = vr0 * (1 - rw) + vr1 * rw;
       if (std::isnan(*res[_d]) || std::isinf(*res[_d])) valid = false;
     }
-    {
+    if (hasRayNum) {
       const uint16_t& v00 = nraygrid[r0 * width + c0];
       const uint16_t& v01 = nraygrid[r0 * width + c1];
       const uint16_t& v10 = nraygrid[r1 * width + c0];
       const uint16_t& v11 = nraygrid[r1 * width + c1];
-      if (hasRayNum)
-        nray = std::min<uint16_t>(v00, std::min<uint16_t>(v01, std::min<uint16_t>(v10, v11)));
-      else
-        nray = 0;
-    }
+      nray = std::min<uint16_t>(v00, std::min<uint16_t>(v01, std::min<uint16_t>(v10, v11)));
+    } else
+      nray = 0;
   } else {
     GDALRasterIOExtraArg args;
+    INIT_RASTERIO_EXTRA_ARG(args);
     args.bFloatingPointWindowValidity = true;
     args.dfXOff = px;
     args.dfYOff = py;
@@ -97,11 +96,11 @@ bool XYZGrid::open(const fs::path gridpath[3], const fs::path raynumpath) {
     args.dfYSize = 1;
     args.eResampleAlg = GRIORA_Bilinear;
     for (int _d = 0; _d < 3; ++_d) {
-      GDALRasterIO(bd[_d], GF_Read, px, py, 1, 1, res[_d], 1, 1, GDT_Float32, sizeof(float), sizeof(float));
+      GDALRasterIOEx(bd[_d], GF_Read, px, py, 1, 1, res[_d], 1, 1, GDT_Float32, sizeof(float), sizeof(float), &args);
       if (std::isnan(*res[_d]) || std::isinf(*res[_d])) valid = false;
     }
     if (hasRayNum)
-      GDALRasterIO(bd[3], GF_Read, px, py, 1, 1, &nray, 1, 1, GDT_UInt16, sizeof(uint16_t), sizeof(uint16_t));
+      GDALRasterIOEx(bd[3], GF_Read, px, py, 1, 1, &nray, 1, 1, GDT_UInt16, sizeof(uint16_t), sizeof(uint16_t), &args);
     else
       nray = 0;
   }

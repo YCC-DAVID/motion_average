@@ -20,6 +20,42 @@
 
 #define FIND_MEDIAN 0
 
+template< typename T>
+class StatVar {
+
+std::string _name;
+  T _E;
+  T _sqE;
+  uint32_t _cnt;
+ public:
+  StatVar(std::string name):_name(name) { _cnt = 0; }
+  void measure(T _v) {
+    if (_cnt == 0) {
+      _E = _v;
+      _sqE = _v.cwiseProduct(_v);
+    } else {
+      _E += (_v - _E) / (_cnt + 1);
+      _sqE += (_v.cwiseProduct(_v) - _sqE) / (_cnt + 1);
+    }
+    _cnt += 1;
+  }
+
+  T getE() const { return _E; }
+  T getVar() const { return _sqE - _E.cwiseProduct(_E); }
+  uint32_t getCount() const { return _cnt; }
+  
+  void print(std::ostream& out) {
+    out << "E(" << _name << ")=" << getE().transpose() <<
+        ", D(" << _name << ")=" << getVar().transpose() << " of " << getCount() << " measurements" << std::endl;
+  }
+
+  void print(spdlog::logger& logger) { 
+    std::stringstream ss;
+    ss << "E(" << _name << ")=" << getE().transpose() << ", D(" << _name << ")=" << getVar().transpose() << " of " << getCount() << " measurements";
+    logger.info(ss.str());
+  }
+};
+
 namespace fs = std::filesystem;
 namespace logg = spdlog;
 using namespace std;
@@ -120,96 +156,191 @@ cxxopts::Options parseOptions(std::string exepath = "") {
 }
 
 float INVALID_VALUE = std::numeric_limits<float>::infinity();
+/*
+bool create_edge_minimize_reproject_error(const XYZGrid* srcXYZ, const XYZGrid* srcTmpXYZ, const XYZGrid* tgtTmpXYZ, const XYZGrid* tgtXYZ, const QinPose& srcPose, const QinPose& tgtPose,
+                                          const float* matches, int numpts, float* offset_n_weight, int minimum_rays, float invsigmasq_2, int minimum_matches, double* xfm, double* cov) {
+  auto srcK = srcPose.GetK();
+  auto srcR = srcPose.GetR();
+  auto srcC = srcPose.GetC();
+  auto tgtK = tgtPose.GetK();
+  auto tgtR = tgtPose.GetR();
+  auto tgtC = tgtPose.GetC();
 
+  Eigen::Vector3d init_bij = -srcC + tgtC;
+  Eigen::Vector3d expected_bij{0, 0, 0};
+  int num_measure = 0;
+  float totalWeight = 0;
+  for (int k = 0; k < numpts; k += 1)  // k-th matched points
+  {
+    std::fill_n(offset_n_weight + 4 * k, 3, INVALID_VALUE);
+    offset_n_weight[4 * k + 3] = 0;
+    const float& srcX = matches[7 * k + 0];
+    const float& srcY = matches[7 * k + 1];
+    const float& tgtX = matches[7 * k + 2];
+    const float& tgtY = matches[7 * k + 3];
 
+    float srcMatch[3];
+    // float srcTmpMatch[3];
+    // float tgtMatch[3];
+    // float tgtTmpMatch[3];
+    uint16_t srcNumRay;
+    // uint16_t srcTmpNumRay;
+    // uint16_t tgtNumRay;
+    // uint16_t tgtTmpNumRay;
+    bool valid0 = srcXYZ->sample(srcX, srcY, srcMatch[0], srcMatch[1], srcMatch[2], srcNumRay);
+    if (!valid0) continue;
+    //bool valid1 = tgtXYZ->sample(tgtX, tgtY, tgtMatch[0], tgtMatch[1], tgtMatch[2], tgtNumRay);
+    //if (!valid1) continue;
+    //bool valid00 = srcTmpXYZ->sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], srcTmpNumRay);
+    //if (!valid00) continue;
 
-bool create_edge_minimize_reproject_error(const XYZGrid* srcXYZ, const XYZGrid* srcTmpXYZ, const XYZGrid* tgtTmpXYZ, const XYZGrid* tgtXYZ,
-    const QinPose& srcPose, const QinPose& tgtPose,
-    const float* matches, int numpts, float* offset_n_weight,
-    int minimum_rays, float invsigmasq_2, int minimum_matches, double* xfm, double* cov) {
+    if (srcNumRay < minimum_rays
+        //|| tgtNumRay < minimum_rays
+    )
+      continue;
+    else {
+      Eigen::Vector3d init_bij = -srcC + tgtC;
+      Eigen::Vector3d objpt_src = Eigen::Vector3d(srcMatch[0], srcMatch[1], srcMatch[2]);
+      // Eigen::Vector3d objpt_tgt = Eigen::Vector3d(tgtMatch[0], tgtMatch[1], tgtMatch[2]);
+      // Eigen::Vector3d campt_tgt2tgt = tgtR * objpt_tgt;
+      // Eigen::Vector3d campt_tmptgt = tgtR * Eigen::Vector3d(tgtTmpMatch[0], tgtTmpMatch[1], tgtTmpMatch[2]);
+      Eigen::Vector3d campt_src2tgt = tgtR * (srcC + objpt_src - tgtC);
+      // Eigen::Vector3d campt_srctmp2tgt = tgtR * (srcC + Eigen::Vector3d(srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2]) - tgtC);
+      double depth_tgt2tgt = campt_tgt2tgt[2];
+      double depth_src2tgt = campt_src2tgt[2];
+      // Eigen::Vector3d imgpt_tgt2tgt = tgtK * campt_tgt2tgt / depth_tgt2tgt;
+      Eigen::Vector3d imgpt_src2tgt = tgtK * campt_src2tgt / depth_src2tgt;
 
-    auto srcK = srcPose.GetK();
-    auto srcR = srcPose.GetR();
-    auto srcC = srcPose.GetC();
-    auto tgtK = tgtPose.GetK();
-    auto tgtR = tgtPose.GetR();
-    auto tgtC = tgtPose.GetC();
-  
-    Eigen::Vector3d init_bij = -srcC + tgtC;
-    Eigen::Vector3d expected_bij{0, 0, 0};
-    int num_measure = 0;
-    float totalWeight = 0;
-    for (int k = 0; k < numpts; k += 1)  // k-th matched points
-    {
-      std::fill_n(offset_n_weight + 4 * k, 3, INVALID_VALUE);
-      offset_n_weight[4 * k + 3] = 0;
-      const float& srcX = matches[7 * k + 0];
-      const float& srcY = matches[7 * k + 1];
-      const float& tgtX = matches[7 * k + 2];
-      const float& tgtY = matches[7 * k + 3];
+      Eigen::Vector3d _bij = objpt_src - tgtR.transpose() * tgtK.inverse() * Eigen::Vector3d{depth_src2tgt * tgtX, depth_src2tgt * tgtY, depth_src2tgt};
 
-      float srcMatch[3];
-      //float srcTmpMatch[3];
-      //float tgtMatch[3];
-      //float tgtTmpMatch[3];
-      uint16_t srcNumRay;
-      //uint16_t srcTmpNumRay;
-      //uint16_t tgtNumRay;
-      //uint16_t tgtTmpNumRay;
-      bool valid0 = srcXYZ->sample(srcX, srcY, srcMatch[0], srcMatch[1], srcMatch[2], srcNumRay);
-      if (!valid0) continue;
-      /*bool valid1 = tgtXYZ->sample(tgtX, tgtY, tgtMatch[0], tgtMatch[1], tgtMatch[2], tgtNumRay);
-      if (!valid1) continue;*/
-      /*bool valid00 = srcTmpXYZ->sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], srcTmpNumRay);
-      if (!valid00) continue;*/
-
-      if (srcNumRay < minimum_rays 
-          //|| tgtNumRay < minimum_rays
-          )
-        continue;
-      else {
-        Eigen::Vector3d init_bij = -srcC + tgtC;
-        Eigen::Vector3d objpt_src = Eigen::Vector3d(srcMatch[0], srcMatch[1], srcMatch[2]);
-        //Eigen::Vector3d objpt_tgt = Eigen::Vector3d(tgtMatch[0], tgtMatch[1], tgtMatch[2]);
-        //Eigen::Vector3d campt_tgt2tgt = tgtR * objpt_tgt;
-        //Eigen::Vector3d campt_tmptgt = tgtR * Eigen::Vector3d(tgtTmpMatch[0], tgtTmpMatch[1], tgtTmpMatch[2]);
-        Eigen::Vector3d campt_src2tgt = tgtR * (srcC + objpt_src - tgtC);
-        //Eigen::Vector3d campt_srctmp2tgt = tgtR * (srcC + Eigen::Vector3d(srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2]) - tgtC);
-        //double depth_tgt2tgt = campt_tgt2tgt[2];
-        double depth_src2tgt = campt_src2tgt[2];
-        //Eigen::Vector3d imgpt_tgt2tgt = tgtK * campt_tgt2tgt / depth_tgt2tgt;
-        Eigen::Vector3d imgpt_src2tgt = tgtK * campt_src2tgt / depth_src2tgt;
-        
-        Eigen::Vector3d _bij = objpt_src - tgtR.transpose() * tgtK.inverse() * Eigen::Vector3d{depth_src2tgt * tgtX, depth_src2tgt * tgtY, depth_src2tgt};
-
-        if (num_measure == 0) {
-          expected_bij = _bij;
-        } else {
-          expected_bij += (_bij - expected_bij) / (num_measure + 1);
-        }
-        
-        ++num_measure;
+      if (num_measure == 0) {
+        expected_bij = _bij;
+      } else {
+        expected_bij += (_bij - expected_bij) / (num_measure + 1);
       }
+
+      ++num_measure;
     }
+  }
 
-    if (num_measure < minimum_matches) return false;
-    bool valid = true;
+  if (num_measure < minimum_matches) return false;
+  bool valid = true;
 
-    totalWeight = num_measure;
-    for (int _d = 0; _d < 3; ++_d) {
-      xfm[_d] = expected_bij[_d];
-      cov[4 * _d] = 1. / totalWeight;
-      if (std::isnan(xfm[_d]) || std::isinf(xfm[_d])) valid = false;
+  totalWeight = num_measure;
+  for (int _d = 0; _d < 3; ++_d) {
+    xfm[_d] = expected_bij[_d];
+    cov[4 * _d] = 1. / totalWeight;
+    if (std::isnan(xfm[_d]) || std::isinf(xfm[_d])) valid = false;
+  }
+
+  return valid;
+}*/
+
+StatVar<Eigen::Vector2d> total_stat_reprojection_error("total reproj");
+
+bool create_edge_minimize_reproject_error2(const XYZGrid* srcTmpXYZ, const XYZGrid* tgtTmpXYZ, const QinPose& srcPose, const QinPose& tgtPose, const float* matches, int numpts, float* offset_n_weight,
+                                           float invsigmasq_2, int minimum_matches, double* xfm, double* cov, spdlog::logger* logger=nullptr) {
+  auto srcK = srcPose.GetK();
+  auto srcR = srcPose.GetR();
+  auto srcC = srcPose.GetC();
+  auto tgtK = tgtPose.GetK();
+  auto tgtR = tgtPose.GetR();
+  auto tgtC = tgtPose.GetC();
+
+  Eigen::Vector3d init_bij = -srcC + tgtC;
+  Eigen::Vector3d expected_bij{0, 0, 0};
+  int num_measure = 0;
+  float totalWeight = 0;
+  
+  StatVar<Eigen::Vector2d> stat_src2tgt_error("src2tgt_reproj");
+  StatVar<Eigen::Vector2d> stat_tgt2tgt_error("tgt2tgt_reproj");
+  StatVar<Eigen::Vector2d> stat_cortgt_error("cortgt_reproj");
+  StatVar<Eigen::Vector3d> stat_bij("bij");
+
+  for (int k = 0; k < numpts; k ++)  // k-th matched points
+  {
+    std::fill_n(offset_n_weight + 4 * k, 3, INVALID_VALUE);
+    offset_n_weight[4 * k + 3] = 0;
+    const float& srcX = matches[7 * k + 0];
+    const float& srcY = matches[7 * k + 1];
+    const float& tgtX = matches[7 * k + 2];
+    const float& tgtY = matches[7 * k + 3];
+
+    float srcTmpMatch[3];
+    float tgtTmpMatch[3];
+    uint16_t dummy;
+    bool valid0 = srcTmpXYZ->sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], dummy);
+    if (!valid0) continue;
+    bool valid1 = tgtTmpXYZ->sample(tgtX, tgtY, tgtTmpMatch[0], tgtTmpMatch[1], tgtTmpMatch[2], dummy);
+    if (!valid1) continue;
+
+    Eigen::Vector3d init_bij = -srcC + tgtC;
+    Eigen::Vector3d objpt_src = Eigen::Vector3d(srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2]);
+    Eigen::Vector3d objpt_tgt = Eigen::Vector3d(tgtTmpMatch[0], tgtTmpMatch[1], tgtTmpMatch[2]);
+    Eigen::Vector3d campt_src2tgt = tgtR * (srcC + objpt_src - tgtC);
+    Eigen::Vector3d campt_tgt2tgt = tgtR * objpt_tgt;
+
+    double depth_src2tgt = campt_src2tgt[2];
+    double depth_tgt2tgt = campt_tgt2tgt[2];
+
+    Eigen::Vector3d imgpt_tgt2tgt = tgtK * campt_tgt2tgt / depth_tgt2tgt;
+    Eigen::Vector3d imgpt_src2tgt = tgtK * campt_src2tgt / depth_src2tgt;
+
+    
+
+    double depth_ = depth_tgt2tgt;
+
+    Eigen::Vector3d _bij = objpt_src - tgtR.transpose() * tgtK.inverse() * (depth_ * Eigen::Vector3d{tgtX, tgtY, 1.0});
+
+    // trust 
+    //std::cout << "A:"<< imgpt_tgt2tgt[0] - tgtX << "," << imgpt_tgt2tgt[1] - tgtY << std::endl;
+    //std::cout << "B:" << imgpt_src2tgt[0] - tgtX << "," << imgpt_src2tgt[1] - tgtY << std::endl;
+    
+    Eigen::Vector3d imgpt_correct_tgt = tgtK * tgtR * (objpt_src - _bij);
+    imgpt_correct_tgt /= imgpt_correct_tgt[2];
+    //std::cout << "C:" << imgpt_correct_tgt[0] - tgtX << "," << imgpt_correct_tgt[1] - tgtY << std::endl;
+
+    stat_src2tgt_error.measure(Eigen::Vector2d{imgpt_src2tgt[0] - tgtX, imgpt_src2tgt[1] - tgtY});
+    total_stat_reprojection_error.measure(Eigen::Vector2d{imgpt_src2tgt[0] - tgtX, imgpt_src2tgt[1] - tgtY});
+    stat_tgt2tgt_error.measure(Eigen::Vector2d{imgpt_tgt2tgt[0] - tgtX, imgpt_tgt2tgt[1] - tgtY});
+    stat_cortgt_error.measure(Eigen::Vector2d{imgpt_correct_tgt[0] - tgtX, imgpt_correct_tgt[1] - tgtY});
+    stat_bij.measure(_bij);
+    if (num_measure == 0) {
+      expected_bij = _bij;
+    } else {
+      expected_bij += (_bij - expected_bij) / (num_measure + 1);
     }
+    ++num_measure;
+  }
+  
+  if (logger == nullptr) {
+    stat_bij.print(std::cout);
+    stat_src2tgt_error.print(std::cout);
+    stat_tgt2tgt_error.print(std::cout);
+    stat_cortgt_error.print(std::cout);
+  } else {
+    stat_bij.print(*logger);
+    stat_src2tgt_error.print(*logger);
+    stat_tgt2tgt_error.print(*logger);
+    stat_cortgt_error.print(*logger);
+  }
 
-    return valid;
+  if (num_measure < minimum_matches) return false;
+  bool valid = true;
+
+  totalWeight = num_measure;
+  std::fill_n(cov, 9, 0.);
+  for (int _d = 0; _d < 3; ++_d) {
+    xfm[_d] = expected_bij[_d];
+    cov[4 * _d] = 1. / totalWeight;
+    if (std::isnan(xfm[_d]) || std::isinf(xfm[_d])) valid = false;
+  }
+
+  return valid;
 }
 
-bool create_edge_minimize_object_points(const XYZGrid* srcXYZ, const XYZGrid* srcTmpXYZ, 
-    const XYZGrid* tgtTmpXYZ, const XYZGrid* tgtXYZ, const float* matches, int numpts, 
-    float* offset_n_weight,int minimum_rays, float invsigmasq_2, int minimum_matches,
-    double* xfm, double*cov) {
-
+bool create_edge_minimize_object_points(const XYZGrid* srcXYZ, const XYZGrid* srcTmpXYZ, const XYZGrid* tgtTmpXYZ, const XYZGrid* tgtXYZ, const float* matches, int numpts, float* offset_n_weight,
+                                        int minimum_rays, float invsigmasq_2, int minimum_matches, double* xfm, double* cov) {
   double meanSrc[3] = {0}, meanTgt[3] = {0};
 #if FIND_MEDIAN
   std::vector<float> offset[3], offDist;
@@ -282,7 +413,7 @@ bool create_edge_minimize_object_points(const XYZGrid* srcXYZ, const XYZGrid* sr
 
   double medianXfm[3] = {offset[0][pos], offset[1][pos], offset[2][pos]};
 
-  spdlog::trace("Median: {} {} {}", medianXfm[0], medianXfm[1], medianXfm[2]);
+  logger.trace("Median: {} {} {}", medianXfm[0], medianXfm[1], medianXfm[2]);
 #endif
   // compute mean value
   for (int _d = 0; _d < 3; ++_d) {
@@ -293,7 +424,7 @@ bool create_edge_minimize_object_points(const XYZGrid* srcXYZ, const XYZGrid* sr
     if (std::isnan(xfm[_d]) || std::isinf(xfm[_d])) valid = false;
   }
 #if FIND_MEDIAN
-  spdlog::trace("Mean: {} {} {}", meanSrc[0] - meanTgt[0], meanSrc[1] - meanTgt[1], meanSrc[2] - meanTgt[2]);
+  logger.trace("Mean: {} {} {}", meanSrc[0] - meanTgt[0], meanSrc[1] - meanTgt[1], meanSrc[2] - meanTgt[2]);
 #endif
   if (!valid) return false;
 
@@ -301,12 +432,18 @@ bool create_edge_minimize_object_points(const XYZGrid* srcXYZ, const XYZGrid* sr
 }
 
 using GraphT = TranslateGraph3WithGCP;
+
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
+
+
 int main(int argc, char** argv) {
   GDALAllRegister();
 
   cxxopts::Options options = parseOptions(argv[0]);
   cxxopts::ParseResult args = options.parse(argc, argv);
-  spdlog::set_level(static_cast<logg::level::level_enum>(args["verbose"].as<int>()));
+
+  
 
   if (args.count("help") != 0) {
     cout << options.help() << endl;
@@ -331,13 +468,24 @@ int main(int argc, char** argv) {
   else
     outfilepath = rootdirpath / outfilename;
 
+  
+  auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+  console_sink->set_level(spdlog::level::debug);
+
+  auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(outfilepath.string() + ".create_graph.log");
+  file_sink->set_level(spdlog::level::trace);
+
+  spdlog::logger logger("LOG", {console_sink, file_sink});
+  logger.set_level(static_cast<logg::level::level_enum>(args["verbose"].as<int>()));
+
+
   if (!fs::exists(qinv2path)) {
-    spdlog::critical("QinPose Not found: {}", qinv2path.string());
+    logger.critical("QinPose Not found: {}", qinv2path.string());
     return 1;
   }
 
   if (hasGCP && !fs::exists(gcppath)) {
-    spdlog::critical("GCP file Not Found: {}", gcppath.string());
+    logger.critical("GCP file Not Found: {}", gcppath.string());
     return 1;
   }
 
@@ -345,7 +493,7 @@ int main(int argc, char** argv) {
   fs::path tempfolderdirpath = rootdirpath / "Point_clouds" / "temp_folder_cluster";
   fs::path Neighborhood_file_path = lasdirpath / "Neighborhood_file.bin";
   if (!fs::exists(Neighborhood_file_path)) {
-    spdlog::critical("File {} not found!", Neighborhood_file_path.string());
+    logger.critical("File {} not found!", Neighborhood_file_path.string());
     return 1;
   }
 
@@ -362,7 +510,7 @@ int main(int argc, char** argv) {
     n.name = poses[i].imgname;
     fs::path tmpfolder = tempfolderdirpath / fs::path(n.name).stem();
     if (!fs::exists(tmpfolder)) {
-      spdlog::error("Tmp folder {} not found!", tmpfolder.string());
+      logger.error("Tmp folder {} not found!", tmpfolder.string());
       return 1;
     }
     n.path = fs::relative(tmpfolder, rootdirpath).string();
@@ -371,7 +519,7 @@ int main(int argc, char** argv) {
     n.xfm[2] = poses[i].z;
     g.insertNode(n);
   }
-  
+
   if (hasGCP) {
     ifstream ifs;
     // Add GCP
@@ -422,7 +570,7 @@ int main(int argc, char** argv) {
       // clang-format on
       XYZGrid viewXYZ(false);
       viewXYZ.open(viewgridpath, fs::path());
-      
+
       uint16_t dummy;
       viewXYZ.sample(l.u, l.v, l.dx, l.dy, l.dz, dummy);
       // TODO: The erro could be derived from grids and correspondences.
@@ -433,10 +581,10 @@ int main(int argc, char** argv) {
       double viewY = l.dy + view.xfm[1];
       double viewZ = l.dz + view.xfm[2];
 
-      spdlog::trace("GCP[{}]-View[{}]: {} {} {}", gcppt.name, view.name, viewX - gcppt.x, viewY - gcppt.y, viewZ - gcppt.z);
+      logger.trace("GCP[{}]-View[{}]: {} {} {}", gcppt.name, view.name, viewX - gcppt.x, viewY - gcppt.y, viewZ - gcppt.z);
     }
   }
-  
+
   // Add Edges
   int numimg, maxpair;
   std::vector<int> neighborbin;
@@ -445,149 +593,138 @@ int main(int argc, char** argv) {
     ifs.open(Neighborhood_file_path.string(), ios::binary);
     ifs.read(reinterpret_cast<char*>(&numimg), sizeof(int));
     ifs.read(reinterpret_cast<char*>(&maxpair), sizeof(int));
-    spdlog::debug("neighbor bin: {} {}", numimg, maxpair);
+    logger.debug("neighbor bin: {} {}", numimg, maxpair);
     neighborbin.resize(numimg * (maxpair + 1));
     ifs.read(reinterpret_cast<char*>(neighborbin.data()), numimg * (maxpair + 1) * sizeof(int));
     ifs.close();
   }
 
+  std::vector<std::vector<int>> decoded_neighbors(numimg);
   for (int i = 0; i < numimg; ++i)  // i-th image
   {
     const int* ids = &neighborbin[i * (maxpair + 1)];
-    spdlog::trace("{}: {}", i, fmt::join(ids + 1, ids + maxpair + 1, ", "));
+    for (const int* _pj = ids + 1; _pj < ids + maxpair + 1; ++_pj) {
+      if (*_pj == -1) break;
+      decoded_neighbors[i].push_back(*_pj);
+    }
+  }
 
+  for (int i = 0; i < numimg; ++i)  // i-th image
+  {
+    const int* ids = &neighborbin[i * (maxpair + 1)];
     int srcId = i;
     string srcName = fs::path(g.nodes[srcId].name).stem().string();
 
-    // if (srcName != "029_065_id3188c81615_124544_Backward") continue;
-
-    // clang-format off
-    fs::path srcgridpath[3] = {
-        tempfolderdirpath / srcName / fmt::format("{}_Xgrid.tif", srcName),
-        tempfolderdirpath / srcName / fmt::format("{}_Ygrid.tif", srcName),
-        tempfolderdirpath / srcName / fmt::format("{}_Zgrid.tif", srcName)};
-    // clang-format on
-    fs::path srcraynumpath = tempfolderdirpath / srcName / fmt::format("{}_ray_num.tif", srcName);
-
-    for (int _d = 0; _d < 3; ++_d)
-      if (!fs::exists(srcgridpath[_d])) {
-        spdlog::error("File Not Found: {}", srcgridpath[_d].string());
-        return 1;
-      }
-    if (!fs::exists(srcraynumpath)) {
-      spdlog::error("File Not Found: {}", srcraynumpath.string());
-      return 1;
-    }
-
-    XYZGrid srcXYZ(true);
-    srcXYZ.open(srcgridpath, srcraynumpath);
-
-#pragma omp parallel for
-    for (int j = 1; j < maxpair + 1; ++j)  // j-th neighbor
-    {
-      if (ids[j] == -1) continue;
-      int tgtId = ids[j];
+    for (int j : decoded_neighbors[i]) {
+      int tgtId = j;
+      string tgtName = fs::path(g.nodes[tgtId].name).stem().string();
       GraphT::Edge e;
       e.source = srcId;
       e.target = tgtId;
-      string tgtName = fs::path(g.nodes[tgtId].name).stem().string();
-      // if (tgtName != "029_056_id3179c82579_124523_Nadir") continue;
+
       fs::path correspondencepixbin = tempfolderdirpath / srcName / fmt::format("{}_{}_correspondence_pix.bin", srcName, tgtName);
       fs::path correspondenceoffsetbin = tempfolderdirpath / srcName / fmt::format("{}_{}_correspondence_offset.bin", srcName, tgtName);
 
       e.name = fs::relative(correspondencepixbin, rootdirpath).string();
       if (!fs::exists(correspondencepixbin)) {
-        spdlog::error("Cannot find correspondence file: {}", correspondencepixbin.string());
+        logger.error("Cannot find correspondence file: {}", correspondencepixbin.string());
         continue;
       }
 
       unsigned int numpts;
       read_correspondence_pts_pix_binary_num(correspondencepixbin.string().c_str(), numpts);
-      spdlog::trace("numpts {}", numpts);
+      logger.trace("numpts {}", numpts);
       if (numpts < minimum_matches) continue;
       std::unique_ptr<float> matches(new float[7 * numpts]);
       std::unique_ptr<float> offset_n_weight(new float[7 * numpts]);
       read_correspondence_pts_pix_binary(correspondencepixbin.string().c_str(), matches.get());
 
-      spdlog::trace("src {} tgt {}", srcName, tgtName);
+      // Now, make combination of src-neighbors and tgt-neighbors, except src-tgt
+      std::vector<std::pair<int, int>> xyzgrid_pairs;
+      for (int adj_srcId : decoded_neighbors[srcId])
+        for (int adj_tgtId : decoded_neighbors[tgtId]) {
+          if (adj_srcId != tgtId && adj_tgtId != srcId) xyzgrid_pairs.emplace_back(adj_srcId, adj_tgtId);
+        }
+      logger.info("Edge[{},{}] requires {} grid pairs", e.source, e.target, xyzgrid_pairs.size());
 
-      // clang-format off
-      fs::path tgtgridpath[3] = {
-          tempfolderdirpath / tgtName / fmt::format("{}_Xgrid.tif", tgtName),
-          tempfolderdirpath / tgtName / fmt::format("{}_Ygrid.tif", tgtName),
-          tempfolderdirpath / tgtName / fmt::format("{}_Zgrid.tif", tgtName)};
-      // clang-format on
-      fs::path tgtraynumpath = tempfolderdirpath / tgtName / fmt::format("{}_ray_num.tif", tgtName);
-
-      // clang-format off
-      fs::path srctempgridpath[3] = {
+      Eigen::Vector3d all_xfm = Eigen::Vector3d::Zero();
+      Eigen::Matrix3d all_cov = Eigen::Matrix3d::Identity();
+      all_cov.fill(10000);
+      for (auto& p : xyzgrid_pairs) {
+        int adj_srcId, adj_tgtId;
+        std::tie(adj_srcId, adj_tgtId) = p;
+        std::string adj_srcName = fs::path(g.nodes[adj_srcId].name).stem().string();
+        std::string adj_tgtName = fs::path(g.nodes[adj_tgtId].name).stem().string();
+        // clang-format off
+    #if 1
+        fs::path srctempgridpath[3] = {
+          tempfolderdirpath / srcName / fmt::format("{}_{}_temgridX.tif", srcName, adj_srcName),
+          tempfolderdirpath / srcName / fmt::format("{}_{}_temgridY.tif", srcName, adj_srcName),
+          tempfolderdirpath / srcName / fmt::format("{}_{}_temgridZ.tif", srcName, adj_srcName)};
+        fs::path tgttempgridpath[3] = {
+          tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridX.tif", tgtName, adj_tgtName),
+          tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridY.tif", tgtName, adj_tgtName),
+          tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridZ.tif", tgtName, adj_tgtName)};
+    #else
+        fs::path srctempgridpath[3] = {
           tempfolderdirpath / srcName / fmt::format("{}_{}_temgridX.tif", srcName, tgtName),
           tempfolderdirpath / srcName / fmt::format("{}_{}_temgridY.tif", srcName, tgtName),
           tempfolderdirpath / srcName / fmt::format("{}_{}_temgridZ.tif", srcName, tgtName)};
-      // clang-format on
-
-      // clang-format off
-      fs::path tgttempgridpath[3] = {
+        fs::path tgttempgridpath[3] = {
           tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridX.tif", tgtName, srcName),
           tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridY.tif", tgtName, srcName),
           tempfolderdirpath / tgtName / fmt::format("{}_{}_temgridZ.tif", tgtName, srcName)};
-      // clang-format on
+    #endif
+        // clang-format on
+        for (int _d = 0; _d < 3; ++_d) {
+          if (!fs::exists(srctempgridpath[_d])) {
+            logger.error("File Not Found: {}", srctempgridpath[_d].string());
+            return 1;
+          }
+          if (!fs::exists(tgttempgridpath[_d])) {
+            logger.error("File Not Found: {}", tgttempgridpath[_d].string());
+            return 1;
+          }
+        }  // for (int _d = 0; _d < 3; ++_d)
 
-      for (int _d = 0; _d < 3; ++_d)
-        if (!fs::exists(tgtgridpath[_d])) {
-          spdlog::error("File Not Found: {}", tgtgridpath[_d].string());
-          continue;
-        }
-      if (!fs::exists(tgtraynumpath)) {
-        spdlog::error("File Not Found: {}", tgtraynumpath.string());
-        continue;
-      }
+        XYZGrid srcTmpXYZ(preloadgrids);
+        srcTmpXYZ.open(srctempgridpath, fs::path());
+        XYZGrid tgtTmpXYZ(preloadgrids);
+        tgtTmpXYZ.open(tgttempgridpath, fs::path());
 
-      for (int _d = 0; _d < 3; ++_d)
-        if (!fs::exists(srctempgridpath[_d])) {
-          spdlog::error("File Not Found: {}", srctempgridpath[_d].string());
-          continue;
-        }
-      //for (int _d = 0; _d < 3; ++_d)
-      //  if (!fs::exists(tgttempgridpath[_d])) {
-      //    spdlog::error("File Not Found: {}", tgttempgridpath[_d].string());
-      //    continue;
-      //  }
-      XYZGrid srcTmpXYZ(preloadgrids);
-      srcTmpXYZ.open(srctempgridpath, fs::path());
-      //XYZGrid tgtTmpXYZ(preloadgrids);
-      //tgtTmpXYZ.open(tgttempgridpath, fs::path());
-      XYZGrid tgtXYZ(preloadgrids);
-      tgtXYZ.open(tgtgridpath, tgtraynumpath);
+        Eigen::Vector3d _pair_xfm;
+        Eigen::Matrix3d _pair_cov;
+        bool valid = create_edge_minimize_reproject_error2(&srcTmpXYZ, &tgtTmpXYZ, poses[srcId], poses[tgtId], matches.get(), numpts, offset_n_weight.get(), invsigmasq_2, minimum_matches,
+                                                           _pair_xfm.data(), _pair_cov.data(), &logger);
 
+        double update_weight = 1. / all_cov(0, 0) + 1. / _pair_cov(0, 0);
 
-      //bool valid = create_edge_minimize_object_points(&srcXYZ, &srcTmpXYZ, nullptr, &tgtXYZ, 
-      //    matches.get(), numpts, offset_n_weight.get(), minimum_rays, invsigmasq_2, minimum_matches, e.xfm, e.cov);
+        all_xfm = (all_xfm * 1. / all_cov(0, 0) + _pair_xfm * 1. / _pair_cov(0, 0)) / update_weight;
+        all_cov = Eigen::Matrix3d::Identity() * 1. / update_weight;
+      }  // for (auto& p : xyzgrid_pairs)
 
-      bool valid = create_edge_minimize_reproject_error(&srcXYZ, &srcTmpXYZ, nullptr, &tgtXYZ, poses[srcId], poses[tgtId], matches.get(), numpts, offset_n_weight.get(), minimum_rays, invsigmasq_2,
-                                                        minimum_matches, e.xfm, e.cov);
-      
+      memcpy(e.xfm, all_xfm.data(), sizeof(double) * 3);
+      memcpy(e.cov, all_cov.data(), sizeof(double) * 9);
 
-      if (!valid) continue;
-      
       double initXfm[3] = {g.nodes[tgtId].xfm[0] - g.nodes[srcId].xfm[0], g.nodes[tgtId].xfm[1] - g.nodes[srcId].xfm[1], g.nodes[tgtId].xfm[2] - g.nodes[srcId].xfm[2]};
 
       double diffXfm[3] = {std::abs(initXfm[0] - e.xfm[0]), std::abs(initXfm[1] - e.xfm[1]), std::abs(initXfm[2] - e.xfm[2])};
-      spdlog::trace("Init: {} {} {}", initXfm[0], initXfm[1], initXfm[2]);
-      spdlog::trace("Edge: {} {} {}", e.xfm[0], e.xfm[1], e.xfm[2]);
-      spdlog::debug("Diff: {} {} {} cm {}, {}", diffXfm[0] * 100, diffXfm[1] * 100, diffXfm[2] * 100, srcName, tgtName);
-#pragma omp critical
-      g.insertEdge(e);
 
-      //write_correspondence_offset_binary(correspondenceoffsetbin.string().c_str(), offset_n_weight.get(), numpts);
-      break;
+      logger.debug("Init: {} {} {}", initXfm[0], initXfm[1], initXfm[2]);
+      logger.debug("Edge: {} {} {}", e.xfm[0], e.xfm[1], e.xfm[2]);
+      logger.debug("Diff: {} {} {} cm {}, {}", diffXfm[0] * 100, diffXfm[1] * 100, diffXfm[2] * 100, srcName, tgtName);
+//#pragma omp critical
+      g.insertEdge(e);
     }
   }
+
+
+  total_stat_reprojection_error.print(logger);
 
   ofstream ofs(outfilepath.string());
   ofs << &g;
   ofs.close();
-  spdlog::info("Done");
+  logger.info("Done");
 
   return 0;
 }
