@@ -18,12 +18,13 @@ struct Edge {
   std::string name;
   int source;
   int target;
+  int order;
   double xfm[N];
-  double cov[N * N];
+  double cov[(N-1) *(N-1)];
   Edge() {
     std::fill_n(xfm, N, 0.);
-    std::fill_n(cov, N * N, 0.);
-    for (int i = 0; i < N; ++i) cov[N * i + i] = 1.;
+    std::fill_n(cov, (N-1) * (N-1), 0.);
+    for (int i = 0; i < (N-1); ++i) cov[(N-1) * i + i] = 1.;
   }
 };
 
@@ -106,14 +107,14 @@ struct GCPGraph {
   }
 };
 
-struct TranslateGraph3WithGCP : public TranslateGraph<3>, public GCPGraph {
+struct TranslateGraph3WithGCP : public TranslateGraph<7>, public GCPGraph {
   
   void rebase(int i) {
-    TranslateGraph<3>::rebase(i);
+    TranslateGraph<7>::rebase(i);
     GCPGraph::rebaseGCP(baseGeo);
   }
   void rebase(const double* newbase) {
-    TranslateGraph<3>::rebase(newbase);
+    TranslateGraph<7>::rebase(newbase);
     GCPGraph::rebaseGCP(baseGeo);
     //assert((baseGeo[0] == baseGCP[0]) && (baseGeo[1] == baseGCP[1]) && (baseGeo[2] == baseGCP[2]));
   }
@@ -180,10 +181,11 @@ struct PoseGraph : public XfmGraph {
     std::string name;
     int target;
     int source;
+    int order;
     double regXfm[DIM] = {0, 1, 0, 0, 0, 1};
-    double covXfm[DIM * DIM] = {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1};
+    double covXfm[DIM* DIM] = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,  1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,  1};
 
-    Edge() : target(-1), source(-1) {}
+    Edge() : target(-1), source(-1), order(-1) {}
   };
 
   std::vector<Edge> edges;
@@ -287,9 +289,9 @@ inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND:
 
 template <int N>
 inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::Edge<N>& e) {
-  ofs << e.name << '\n' << e.target << ',' << e.source << '\n';
+  ofs << e.name << '\n' << e.target << ',' << e.source << '\n' << e.order << '\n';
   for (int i = 0; i < N; ++i) ofs << e.xfm[i] << ((i < N - 1) ? ',' : '\n');
-  for (int i = 0; i < N * N; ++i) ofs << e.cov[i] << ((i < N * N - 1) ? ',' : '\n');
+  for (int i = 0; i < (N-1) * (N-1); ++i) ofs << e.cov[i] << ((i < (N-1) * (N-1) - 1) ? ',' : '\n');
   return ofs;
 }
 
@@ -336,7 +338,7 @@ inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND:
 
 inline std::ostream& operator<<(std::ostream& ofs, const motionavg::TranslateND::TranslateGraph3WithGCP* g) {
   ofs << "Translate3GraphWithGCP\n";
-  ofs << static_cast<const motionavg::TranslateND::TranslateGraph<3>*>(g);
+  ofs << static_cast<const motionavg::TranslateND::TranslateGraph<7>*>(g);
   ofs << static_cast<const motionavg::TranslateND::GCPGraph*>(g);
   return ofs;
 }
@@ -354,9 +356,9 @@ inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::Node<
 template <int N>
 inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::Edge<N>& e) {
   char dummy;
-  ifs >> e.name >> dummy >> e.target >> dummy >> e.source >> dummy;
+  ifs >> e.name >> dummy >> e.target >> dummy >> e.source >> dummy >> e.order >> dummy;
   for (int i = 0; i < N; ++i) ifs >> e.xfm[i] >> dummy;
-  for (int i = 0; i < N * N; ++i) ifs >> e.cov[i] >> dummy;
+  for (int i = 0; i < (N-1) * (N-1); ++i) ifs >> e.cov[i] >> dummy;
   return ifs;
 }
 
@@ -369,8 +371,11 @@ inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::Trans
   ifs >> format_identifier >> dummy >> dim >> dummy;
   if (format_identifier != "TranslateGraph") return ifs;
   if (dim != N) return ifs;
+  //std::string baseid;
+  //ifs >> baseid >> dummy;
   ifs >> g->basepath >> dummy;
   ifs >> g->baseID >> dummy;
+  
   for (int i = 0; i < N; ++i) ifs >> g->baseGeo[i] >> dummy;
   size_t num_nodes, num_edges;
   ifs >> num_nodes >> dummy;
@@ -419,7 +424,7 @@ inline std::istream& operator>>(std::istream& ifs, motionavg::TranslateND::Trans
   std::string format_identifier;
   ifs >> format_identifier >> dummy;
   if (format_identifier != "Translate3GraphWithGCP") return ifs;
-  ifs >> static_cast<motionavg::TranslateND::TranslateGraph<3>*>(g);
+  ifs >> static_cast<motionavg::TranslateND::TranslateGraph<7>*>(g);
   ifs >> static_cast<motionavg::TranslateND::GCPGraph*>(g);
   return ifs;
 }
