@@ -331,7 +331,7 @@ bool create_edge_minimize_reproject_error2(const XYZGrid* srcTmpXYZ, const XYZGr
   
   cv::eigen2cv(ceRot, cersRot);
 
-  cv::Mat IntK(3, 3, CV_64F);
+  cv::Mat IntK(3, 3, CV_64F); 
   cv::eigen2cv(tgtK,IntK);
 
  cv::Mat distCof(1, 5, CV_64F);

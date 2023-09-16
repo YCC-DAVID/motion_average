@@ -8,11 +8,16 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <ceres/ceres.h>
+#include <ceres/rotation.h>
+using ceres::Solve;
+using ceres::Solver;
 
 #include "MoAve_0.h"
 #include "MoAve_Affine.h"
 #include "mystructs.h"
 #include "myutils.h"
+//#include "local_parameterization.h"
 
 using namespace std;
 namespace logg = spdlog;
@@ -20,6 +25,65 @@ using namespace motionavg::TranslateND;
 using GraphT = TranslateGraph3WithGCP;
 
 constexpr double GCPWeightFactor = 0.05;
+
+struct PoseGraph3dError {
+  PoseGraph3dError(Eigen::Vector3d rTrans_srctgt, Eigen::Quaternion<double> rRot_srctgt, Eigen::Matrix<double, 6, 6> cov)  //,Eigen::Matrix<double, 6, 6> cov
+      : Trans_srctgt(rTrans_srctgt), Rot_srctgt(rRot_srctgt), Cov(cov) {}                                                    //, Cov(cov)
+  template <typename T>
+ bool operator()(const T* const p_s_ptr, const T* const q_s_ptr, const T* const p_t_ptr, const T* const q_t_ptr, T* residuals_ptr) const {  // const T* const p_t_ptr, const T* const q_t_ptr, 
+  
+
+    Eigen::Matrix<T, 3, 1>  posi_src(p_s_ptr);
+    Eigen::Quaternion<T> quat_src(q_s_ptr[0], q_s_ptr[1], q_s_ptr[2], q_s_ptr[3]);
+    T quaw = quat_src.w();
+    Eigen::Matrix<T, 3, 1> posi_tgt(p_t_ptr);
+    Eigen::Quaternion<T> quat_tgt(q_t_ptr[0], q_t_ptr[1], q_t_ptr[2], q_t_ptr[3]);
+
+    // Compute the relative transformation between the two frames.
+    Eigen::Quaternion<T> quat_src_inverse = quat_src.inverse();
+    Eigen::Quaternion<T> quat_estimated = quat_tgt * quat_src_inverse;
+
+    // Represent the displacement between the two frames in the A frame.
+    Eigen::Matrix<T, 3, 1> trans = posi_tgt - posi_src;
+    Eigen::Matrix<T, 3, 1> trans_srctgt = quat_src * trans;  //(posi_tgt- posi_src);
+    //ceres::QuaternionRotatePoint(quat_src.coeffs().data(), trans.data(), trans_srctgt.data());
+
+    // Compute the error between the two orientation estimates.
+    Eigen::Quaternion<T> delta_q = Rot_srctgt.template cast<T>() *quat_estimated.conjugate();
+    T quaRw = Rot_srctgt.template cast<T>().w();
+    T quadw = delta_q.w();
+    // Compute the residuals.
+    // [ position         ]   [ delta_p          ]
+    // [ orientation (3x1)] = [ 2 * delta_q(0:2) ]
+    //Eigen::Map<Eigen::Matrix<T, 6, 1>> residuals(residuals_ptr);
+    residuals_ptr[0] = trans_srctgt[0] - Trans_srctgt.template cast<T>()[0];
+    residuals_ptr[1] = trans_srctgt[1] - Trans_srctgt.template cast<T>()[1];
+    residuals_ptr[2] = trans_srctgt[2] - Trans_srctgt.template cast<T>()[2];
+    //residuals_ptr[3] = T(1.0) - delta_q.coeffs()[3];
+    residuals_ptr[3] = T(2.0) * delta_q.coeffs()[0];
+    residuals_ptr[4] = T(2.0) * delta_q.coeffs()[1];
+    residuals_ptr[5] = T(2.0) * delta_q.coeffs()[2];
+    
+    Eigen::Map<Eigen::Matrix<T, 6, 1>> residuals(residuals_ptr);
+    residuals.applyOnTheLeft(Cov);
+    //residuals_ptr[6] = T(1.0) - delta_q.coeffs()[3];
+    //residuals.template block<3, 1>(0, 0) = trans_srctgt - Trans_srctgt.template cast<T>();
+    //residuals.template block<3, 1>(3, 0) = delta_q.vec();//T(2.0) *
+    /*residuals(6, 0) = T(1.0) - qsnorm;
+    residuals(7, 0) = T(1.0) - qtnorm;*/
+   
+    // Scale the residuals by the measurement uncertainty.
+    //residuals.applyOnTheLeft(sqrt_information_.template cast<T>());
+
+    return true;
+  }
+
+ private:
+  Eigen::Vector3d Trans_srctgt;
+  Eigen::Quaternion<double> Rot_srctgt;
+  Eigen::Matrix<double, 6, 6> Cov;
+};
+
 GraphT solve_translate_MoAve_0_direct(const GraphT& g) {
   GraphT og = g;
 
@@ -55,7 +119,7 @@ GraphT solve_translate_MoAve_0_direct(const GraphT& g) {
     Eigen::Matrix<double, 3, 3> PMat = covMat.inverse();
 
     Eigen::JacobiSVD<Eigen::Matrix<double, 3, 3>> svd(PMat, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::Vector<double, 3> s_sqrt = svd.singularValues().cwiseSqrt();
+    Eigen::Vector3d s_sqrt = svd.singularValues().cwiseSqrt();
     Eigen::Matrix<double, 3, 3> PMatSqrt = svd.matrixU() * s_sqrt.asDiagonal() * svd.matrixV().transpose();
 
     u.InvCovMatrix.resize(9);
@@ -137,7 +201,7 @@ GraphT solve_translate_MoAve_0_iter(const GraphT& g) {
     Eigen::Matrix<double, 3, 3> PMat = covMat.inverse();
 
     Eigen::JacobiSVD<Eigen::Matrix<double, 3, 3>> svd(PMat, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::Vector<double, 3> s_sqrt = svd.singularValues().cwiseSqrt();
+    Eigen::Vector3d s_sqrt = svd.singularValues().cwiseSqrt();
     Eigen::Matrix<double, 3, 3> PMatSqrt = svd.matrixU() * s_sqrt.asDiagonal() * svd.matrixV().transpose();
 
     u.InvCovMatrix.resize(9);
@@ -293,18 +357,72 @@ int main(int argc, char** argv) {
 
   ifstream ifs(input_graph.string());
 
+  //ceres::LocalParameterization* quaternion_local_parameterization = new ceres::EigenQuaternionParameterization();
+
   GraphT g;
   ifs >> &g;
-  graph_normalize_pairwise_cov(g);
+  ceres::Problem problem;
+  bool flag = false;
 
-  evaluate(g, false);
-  g.rebase(0);
-  GraphT direct = solve_translate_MoAve_0_direct(g);
-  direct.rebase(-1);
+  for (int ei = 0; ei < g.edges.size(); ++ei) {
+    GraphT::Edge& e = g.edges[ei];
+    GraphT::Node& srcN = g.nodes[e.source];
+    GraphT::Node& tgtN = g.nodes[e.target];
+    /*double& posi_src, quat_src;
+    double posi_tgt[3], quat_tgt[4];*/
+    double trans_srctgt[3];
+    double rot_srctgt[4];
+    for (int i = 0; i < 3; i++) {
+     /* posi_src[i] = srcN.xfm[i];
+      posi_tgt[i] = tgtN.xfm[i];*/
+      trans_srctgt[i] = e.xfm[i];
+    }
+    for (int j = 3; j < 7; j++) {
+      /*quat_src[j] = srcN.xfm[j];
+      quat_tgt[j] = tgtN.xfm[j];*/
+      rot_srctgt[j-3] = e.xfm[j];
+    }
+    Eigen::Map < Eigen::Matrix<double, 6, 6>> Cov_weight(e.cov);
+    //Cov_weight = Cov_weight.array().square().matrix();
+    //Eigen::Matrix<double, 6, 6> Cov_weight=Eigen::MatrixXd::Identity(6,6);
+    Eigen::Vector3d trans_srctgt_(trans_srctgt);
+    Eigen::Quaternion rot_srctgt_(rot_srctgt[0], rot_srctgt[1], rot_srctgt[2], rot_srctgt[3]);
+  //  Eigen::Quaternion Rot = rot_srctgt_ * rot_srctgt_.conjugate();
+    problem.AddResidualBlock(new ceres::AutoDiffCostFunction<PoseGraph3dError, 6 ,3,4,3,4>
+        (new PoseGraph3dError(trans_srctgt_, rot_srctgt_,Cov_weight)), nullptr,srcN.xfm ,srcN.xfm+3,tgtN.xfm,tgtN.xfm+3);//,Cov_weight
+    problem.AddParameterBlock(srcN.xfm + 3, 4, new ceres::EigenQuaternionParameterization);
+    problem.AddParameterBlock(tgtN.xfm + 3, 4, new ceres::EigenQuaternionParameterization);
+    if (!flag) {
+      problem.SetParameterBlockConstant(srcN.xfm);
+      problem.SetParameterBlockConstant(srcN.xfm + 3);
+      flag = true;
+    }
+
+    //problem.AddParameterBlock(quat_tgt, 4, new ceres::QuaternionParameterization());
+  }
+ /*int edge_num = g.edges.size();
+  for (int i = 0; i < edge_num; i++) {
+   g.edges();
+  }*/
+//  graph_normalize_pairwise_cov(g);
+
+
+  //evaluate(g, false);
+  Solver::Options options_;
+  options_.function_tolerance = 1e-9;
+  options_.linear_solver_type = ceres::DENSE_QR;
+  options_.minimizer_progress_to_stdout = true;
+
+  ceres::Solver::Summary summary;
+  ceres::Solve(options_, &problem, &summary);
+  //g.rebase(0);
+  //GraphT direct = solve_translate_MoAve_0_direct(g);
+  GraphT direct = g;
+  //direct.rebase(-1);
   ofstream ofs(output_name.string());
   ofs << &direct;
   ofs.close();
-  evaluate(direct, false);
+  //evaluate(direct, false);
 
   // GraphT iter = solve_translate_MoAve_0_iter(g);
   // iter.rebase(-1);

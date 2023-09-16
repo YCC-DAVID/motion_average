@@ -6,9 +6,7 @@ spdlog/1.9.2
 doctest/2.4.8
 nlohmann_json/3.11.2
 opencv/4.5.5
-libwebp/1.2.4
 eigen/3.3.9
-openssl/1.1.1t
 
 [generators]
 visual_studio

@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{51353A91-E9FF-40D7-AAFD-C9C17DB843BF}"
 	ProjectSection(SolutionItems) = preProject
 		conanfile.txt = conanfile.txt
+		pushtest.txt = pushtest.txt
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "apps", "apps", "{DC73FB6B-5D38-45B0-B56D-E151E78575DB}"
@@ -130,6 +131,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{252F
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "evaluate_MSP_densecorr", "prototype\evaluate_MSP_densecorr\evaluate_MSP_densecorr.vcxproj", "{D20356A0-631B-4D83-B0D2-661A40632607}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "creat_relative_pose_corrspondence", "prototype\creat_relative_pose_corrspondence\creat_relative_pose_corrspondence.vcxproj", "{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -315,6 +318,14 @@ Global
 		{D20356A0-631B-4D83-B0D2-661A40632607}.Release|x64.Build.0 = Release|x64
 		{D20356A0-631B-4D83-B0D2-661A40632607}.Release|x86.ActiveCfg = Release|Win32
 		{D20356A0-631B-4D83-B0D2-661A40632607}.Release|x86.Build.0 = Release|Win32
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Debug|x64.ActiveCfg = Debug|x64
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Debug|x64.Build.0 = Debug|x64
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Debug|x86.ActiveCfg = Debug|Win32
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Debug|x86.Build.0 = Debug|Win32
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Release|x64.ActiveCfg = Release|x64
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Release|x64.Build.0 = Release|x64
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Release|x86.ActiveCfg = Release|Win32
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -344,6 +355,7 @@ Global
 		{27601DA0-19F4-4AB4-BD4D-1A512AA2C23D} = {665657F8-AA83-47F2-BF66-267AA6F11E8E}
 		{407F45F5-12F2-44CD-8688-1368A1D716A0} = {665657F8-AA83-47F2-BF66-267AA6F11E8E}
 		{D20356A0-631B-4D83-B0D2-661A40632607} = {665657F8-AA83-47F2-BF66-267AA6F11E8E}
+		{8A11F7A3-BFE8-4A4F-85BE-B3FADEE6AD16} = {665657F8-AA83-47F2-BF66-267AA6F11E8E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3AE5A347-1A24-4D1D-906E-20B0B99C650E}
