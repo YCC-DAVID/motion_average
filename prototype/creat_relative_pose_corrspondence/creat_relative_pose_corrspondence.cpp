@@ -123,40 +123,80 @@ StatVar<Eigen::Vector2d> total_stat_reprojection_error("total reproj");
 bool check_pose(cv::Mat R1_cand, cv::Mat R2_cand, cv::Mat t_cand, std::vector<cv::Point2f> inlier1, std::vector<cv::Point2f> inlier2, cv::Mat* R_res, cv::Mat* t_res) {
   cv::Mat R1(R1_cand), R2(R2_cand), t(t_cand), neg_t;  // 2 rotation and 1 translation get from essential matrix
   neg_t = -t;
+  cv::Mat R1_t(R1.t()), R2_t(R2.t());
   cv::Mat P1 = cv::Mat::eye(3, 4, CV_64F);  // projection matrix of first camera
   cv::Mat P2(3, 4, CV_64F);                 // projection matrix of second camera
+  cv::Mat CurrentR,CurrentT;
 
   int bestSolution = -1;
   int maxInFront = 0;
+  int sample_rate=100;
+  cv::Mat Mat_inlier1(2, inlier1.size(), CV_64F);
+  cv::Mat Mat_inlier2(2, inlier2.size(), CV_64F);
+  for (size_t i = 0; i < inlier1.size() / sample_rate; ++i) {
+    Mat_inlier1.at<double>(0, i) = inlier1[i * sample_rate].x;
+    Mat_inlier1.at<double>(1, i) = inlier1[i * sample_rate].y;
+
+    Mat_inlier2.at<double>(0, i) = inlier2[i * sample_rate].x;
+    Mat_inlier2.at<double>(1, i) = inlier2[i * sample_rate].y;
+  }
 
   // check the possible pose
   for (int solution = 0; solution < 4; solution++) {
     if (solution == 0) {
       R1.copyTo(P2(cv::Rect(0, 0, 3, 3)));
       t.copyTo(P2.col(3));
+      CurrentR = R1;
+      CurrentT = t;
     } else if (solution == 1) {
       R1.copyTo(P2(cv::Rect(0, 0, 3, 3)));
       neg_t.copyTo(P2.col(3));
+      CurrentR = R1;
+      CurrentT = neg_t;
     } else if (solution == 2) {
       R2.copyTo(P2(cv::Rect(0, 0, 3, 3)));
       t.copyTo(P2.col(3));
+      CurrentR = R2;
+      CurrentT = t;
+    /*} else if (solution == 3) {
+      R1_t.copyTo(P2(cv::Rect(0, 0, 3, 3)));
+      t.copyTo(P2.col(3));
+      CurrentR = R1_t;
+      CurrentT = t;
+    } else if (solution == 4) {
+      R2_t.copyTo(P2(cv::Rect(0, 0, 3, 3)));
+      t.copyTo(P2.col(3));
+      CurrentR = R2_t;
+      CurrentT = t;*/
     } else {
       R2.copyTo(P2(cv::Rect(0, 0, 3, 3)));
       neg_t.copyTo(P2.col(3));
+      CurrentR = R2;
+      CurrentT = neg_t;
     }
-
-    ;
     cv::Mat point3D(1, 4, CV_64F);
-    cv::triangulatePoints(P1, P2, inlier1, inlier2, point3D);
+    int forward_num = 0;
+    int point1_positive = 0;
+    int point2_positive = 0;
+
+    cv::triangulatePoints(P1, P2, Mat_inlier2, Mat_inlier1, point3D);
 
     // homography to 3d
-    cv::Mat point3DNormalized = point3D / point3D.at<double>(3);
+    for (int j = 0; j < inlier1.size() / sample_rate; j++) {
+      cv::Mat point3DNormalized = point3D.col(j) / point3D.col(j).at<double>(3);
 
-    // identify if the point before the image
-    cv::Mat point3DNormalized2 = R1 * point3DNormalized.rowRange(0, 3) + t;
-    if (point3DNormalized.at<double>(2) > 0 && point3DNormalized2.at<double>(2) > 0) {
-      bestSolution = solution;
-      break;
+      // identify if the point before the image
+     
+      cv::Mat point3DNormalized2 = CurrentR * point3DNormalized.rowRange(0, 3) + CurrentT;
+      if (point3DNormalized.at<double>(2) > 0) point1_positive++;
+      if (point3DNormalized2.at<double>(2) > 0) point2_positive++;
+      if (point3DNormalized.at<double>(2) > 0 && point3DNormalized2.at<double>(2) > 0) forward_num++;
+    
+    }
+    if (forward_num > maxInFront) {
+        maxInFront = forward_num;
+        bestSolution = solution;
+        //break;
     }
   }
 
@@ -175,11 +215,48 @@ bool check_pose(cv::Mat R1_cand, cv::Mat R2_cand, cv::Mat t_cand, std::vector<cv
   } else if (bestSolution == 2) {
     R2.copyTo(*R_res);
     t.copyTo(*t_res);
+  //} else if (bestSolution == 3) {
+  //  R1_t.copyTo(*R_res);
+  //  t.copyTo(*t_res);
+  //} else if (bestSolution == 4) {
+  //  R2_t.copyTo(*R_res);
+  //  t.copyTo(*t_res);
   } else {
     R2.copyTo(*R_res);
     neg_t.copyTo(*t_res);
   }
   return true;
+}
+bool check_pose_temp(cv::Mat R1_cand, cv::Mat R2_cand, cv::Mat t_cand, cv::Mat ori_R, cv::Mat ori_t,cv::Mat * R_final, cv::Mat* t_final) { 
+  cv::Mat R1(R1_cand), R2(R2_cand), t(t_cand), neg_t(-t_cand),orig_R(ori_R),orig_t(ori_t);
+  cv::Mat  Rot_final;
+  cv::Scalar Rotdif;
+  Rotdif = cv::sum(cv::abs(orig_R - R1));
+  cout << "rot diff" << cv::sum(cv::abs(orig_R - R1)) << endl;
+  //Rotdif2 = cv::sum(cv::sum(cv::abs(ori_R - R2_cand)));
+  if (Rotdif.val[0] < 1) {
+    R1.copyTo(*R_final);
+  } else {
+    R2.copyTo(*R_final);
+  }
+  Rot_final = *R_final;
+ cv::Scalar transdiff;
+  transdiff = cv::sum(cv::abs(orig_t + Rot_final.t() * t));
+ cout << "trans diff" << transdiff << endl;
+  if (transdiff.val[0] < 1) {
+   t.copyTo(*t_final);
+ } else {
+   neg_t.copyTo(*t_final);
+ }
+ return true;
+}
+
+double pointToLineDistance(const cv::Mat& line, const cv::Point2f& point) {
+  double uppat = std::abs(line.at<double>(0, 0) * point.x + line.at<double>(1, 0) * point.y + line.at<double>(2, 0));
+  double lowpat = std::sqrt(line.at<double>(0, 0) * line.at<double>(0, 0) + line.at<double>(1,0) * line.at<double>(1, 0));
+  double dis = uppat / lowpat;
+  return dis;
+        
 }
 
 bool create_edge_from_corrspondence_pts(const QinPose& srcPose, const QinPose& tgtPose, const float* matches, int numpts, float* offset_n_weight,
@@ -221,22 +298,16 @@ bool create_edge_from_corrspondence_pts(const QinPose& srcPose, const QinPose& t
     posi[i] = srcTrans[i];
     posi_o[i] = posi[i];
   }
+  
+  Eigen::Quaterniond quan(src2tgtR);
+  quan.normalize();
+  
 
   cv::Mat vec_rota;
   cv::eigen2cv(src2tgtR, vec_rota);
   cv::Mat rvec;
   cv::Rodrigues(vec_rota, rvec);
   cv::Mat tvec(3, 1, CV_64F, posi_o);
-
-  Eigen::Quaterniond quan(src2tgtR);
-  double test = quan.w();
-  quan.normalize();
-  Rot[0] = quan.w();
-  Rot[1] = quan.x();
-  Rot[2] = quan.y();
-  Rot[3] = quan.z();
-
-  // problem.AddParameterBlock(Rot, 4, new ceres::EigenQuaternionParameterization());
 
   for (int k = 0; k < numpts; k++)  // k-th matched points
   {
@@ -247,48 +318,28 @@ bool create_edge_from_corrspondence_pts(const QinPose& srcPose, const QinPose& t
     const float& tgtX = matches[7 * k + 2];
     const float& tgtY = matches[7 * k + 3];  // just use the pixel coordinate not care 3d coordinate
 
-    //float srcTmpMatch[3];
-    //float tgtTmpMatch[3];
-    //uint16_t dummy;
-   /* bool valid0 = srcTmpXYZ->sample(srcX, srcY, srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2], dummy);
-    if (!valid0) continue;
-    bool valid1 = tgtTmpXYZ->sample(tgtX, tgtY, tgtTmpMatch[0], tgtTmpMatch[1], tgtTmpMatch[2], dummy);
-    if (!valid1) continue;*/
-    // sample according image to read the 3D points in the coordinate which origin point same with camera coordinate and orientation same with coordinate
-
-    // Eigen::Vector3d init_bij = -srcC + tgtC;//repeat defination and didn't use
-    /*Eigen::Vector3d objpt_src = Eigen::Vector3d(srcTmpMatch[0], srcTmpMatch[1], srcTmpMatch[2]);
-    Eigen::Vector3d objpt_src_ = srcR * objpt_src;*/
-
-    //Matchpoints3d.push_back(cv::Point3f(objpt_src_[0], objpt_src_[1], objpt_src_[2]));
     Matchpointsimg_beg.push_back(cv::Point2f(srcX, srcY));
     Matchpointsimg_end.push_back(cv::Point2f(tgtX, tgtY));
 
-    // problem.AddResidualBlock(new ceres::AutoDiffCostFunction<ReprojectError, 2, 3, 4>(new ReprojectError(tgtK, tgtX, tgtY, objpt_src_)), nullptr, posi, Rot);
     num_measure++;
   }
-  // bool isblock=problem.IsParameterBlockConstant();
 
   if (num_measure < minimum_matches) return false;
-
-  Eigen::Quaternion quan_Rot(Rot[0], Rot[1], Rot[2], Rot[3]);
-  Eigen::Matrix3d ceRot;
-  ceRot = quan_Rot.normalized().toRotationMatrix();
-
-  cv::Mat cersRot(3, 3, CV_64F);
-
-  cv::eigen2cv(ceRot, cersRot);
 
   cv::Mat IntK(3, 3, CV_64F);
   cv::eigen2cv(tgtK, IntK);
 
+  //std::cout << "camera matrix" << std::endl << IntK << std::endl;
   cv::Mat distCof(1, 5, CV_64F);
   distCof = cv::Mat(0, 0, 0, 0, 0);
 
   // calculate the fundamental matrix
   cv::Mat inlier;
-  cv::Mat F = cv::findFundamentalMat(Matchpointsimg_beg, Matchpointsimg_end, cv::FM_RANSAC, 3.0, 0.99, inlier);
-  std::cout << "Fundamental Matrix:" << std::endl << F << std::endl;
+  //cv::Mat F = cv::findFundamentalMat(Matchpointsimg_beg, Matchpointsimg_end, cv::FM_RANSAC, 0.001, 0.99, inlier);
+  cv::Mat Ess = cv::findEssentialMat(Matchpointsimg_beg, Matchpointsimg_end, IntK,cv::RANSAC,0.99,0.001,inlier );
+  //Ess = Ess.t();
+  //std::cout << "essential Matrix:" << std::endl << Ess << std::endl;
+  //std::cout << "Fundamental Matrix:" << std::endl << F << std::endl;
 
   // find the inlier
   std::vector<cv::Point2f> inliers1, inliers2;
@@ -298,86 +349,107 @@ bool create_edge_from_corrspondence_pts(const QinPose& srcPose, const QinPose& t
       inliers2.push_back(Matchpointsimg_end[i]);
     }
   }
-  std::cout << "Number of inliers: " << inliers1.size() << "Ratio of inliers: "<<inliers1.size()/num_measure<<std::endl;
+  int inlier_num = inliers1.size();
+  double inlier_rt = double((inlier_num+0.0) / num_measure);
+  std::cout << "Number of inliers: " << inliers1.size() << " Ratio of inliers: " << inlier_rt << std::endl;
 
   // calculate the rotation and translation
 
-  cv::Mat E = IntK.t() * F * IntK;
-
-  cv::Mat R1, R2, t;
-  cv::decomposeEssentialMat(E, R1, R2, t);
-
-  cv::Mat R_final, t_final;
-  // trangluate to test which pose is correct
-  check_pose(R1, R2, t, inliers1, inliers2, &R_final, &t_final);
-
-
-  cv::Mat quat_res;
-  cv::Rodrigues(R_final, quat_res);
-
+  //cv::Mat E = IntK.t() * F * IntK;
   cv::Mat cvRot;
   cv::Rodrigues(rvec, cvRot);
+
   double trans_length = norm(tvec);
+  cv::Mat R1, R2, t,t_l;
+  cv::decomposeEssentialMat(Ess, R1, R2, t);
+  cv::Mat t_uni = t/ norm(t);
+  t_l = t_uni * trans_length;
+  Eigen::Matrix3d R1_eig;
+  cv::cv2eigen(R1,R1_eig);
+  Eigen::Quaterniond quat_R1(R1_eig);
+
+  Eigen::Matrix3d R2_eig;
+  cv::cv2eigen(R2 ,R2_eig);
+  Eigen::Quaterniond quat_R2(R2_eig);
+
+  Eigen::Matrix3d R1_eig_t;
+  cv::cv2eigen(R1.t(), R1_eig_t);
+  Eigen::Quaterniond quat_R1_t(R1_eig_t);
+
+  Eigen::Matrix3d R2_eig_t;
+  cv::cv2eigen(R2.t(), R2_eig_t);
+  Eigen::Quaterniond quat_R2_t(R2_eig_t);
+
+  cout << "R1 : [" << quat_R1.w() << "," << quat_R1.x() << "," << quat_R1.y() << "," << quat_R1.z() << "]" << endl;
+  cout << "R2 : [" << quat_R2.w() << "," << quat_R2.x() << "," << quat_R2.y() << "," << quat_R2.z() << "]" << endl;
+  //cout << "R1 transpose : [" << quat_R1_t.w() << "," << quat_R1_t.x() << "," << quat_R1_t.y() << "," << quat_R1_t.z() << "]" << endl;
+  //cout << "R2 transpose: [" << quat_R2_t.w() << "," << quat_R2_t.x() << "," << quat_R2_t.y() << "," << quat_R2_t.z() << "]" << endl;
+  cv::Mat R_final, t_final_,t_final;
+
+  // trangluate to test which pose is correct
+  /*bool findFlag=check_pose(R1, R2, t_l, inliers1, inliers2, &R_final, &t_final_);
+  if (!findFlag) return false;*/
+  check_pose_temp(R1, R2, t_l, cvRot, tvec, &R_final, &t_final_);
+  t_final = -R_final.t()*t_final_;
+  
+
+  double img2_err=0;
+  
+  for (size_t i = 0; i < inliers1.size(); ++i) {
+    cv::Mat pt1 = (cv::Mat_<double>(3, 1) <<inliers1[i].x, inliers1[i].y, 1.0);
+    cv::Mat line = IntK.t().inv() * Ess * IntK.inv() * pt1;
+    //cv::Mat line = pt1.t() * F.t();
+  
+    double distance = pointToLineDistance(line, inliers2[i]);
+
+    img2_err = img2_err + distance;
+    //std::cout << "Distance from point " << i << " to its epipolar line: " << distance << std::endl;
+  }
+
+  Eigen::Matrix3d Final_Rota;
+  cv::cv2eigen(R_final, Final_Rota);
+  Eigen::Quaterniond quat_res(Final_Rota);
+  quat_res.normalize();
+
+ 
+
   cv::Mat t_uni_vect = t_final / norm(t_final);
   cv::Mat rel_Trans = t_uni_vect * trans_length;
   cv::Mat Tvec;
   Tvec = -cvRot.t() * tvec;
-
-  // calculate the reproject error of opencv
- /* cv::projectPoints(Matchpoints3d, R_final, tvec, IntK, distCof, cvReprj_px);
-  std::vector<cv::Point2f> cvReprj_diff;
-  cv::Point2f cvReprj_diff_sum(0, 0);
-  for (size_t i = 0; i < cvReprj_px.size(); ++i) {
-    cv::Point2f point_diff = Matchpointsimg_end[i] - cvReprj_px[i];
-    cvReprj_diff.push_back(point_diff);
-    cvReprj_diff_sum += cv::Point2f(std::abs(point_diff.x), std::abs(point_diff.y));
-  }*/
-
-  ////// calculate the reproject error of ceres
-  //cv::Mat ce_rvec;
-  //cv::Rodrigues(cersRot, ce_rvec);
-  //cv::Mat ce_tvec;
-  //cv::Mat tvec_ce = cv::Mat(3, 1, CV_64F, posi);
-  //ce_tvec = -cersRot * tvec_ce;
-  //cv::projectPoints(Matchpoints3d, ce_rvec, ce_tvec, IntK, distCof, ceReprj_px);
-  //std::vector<cv::Point2f> ceReprj_diff;
-  //cv::Point2f ceReprj_diff_sum(0, 0);
-  //for (size_t i = 0; i < ceReprj_px.size(); ++i) {
-  //  cv::Point2f point_diff = Matchpointsimg_end[i] - ceReprj_px[i];
-  //  ceReprj_diff.push_back(point_diff);
-  //  ceReprj_diff_sum += cv::Point2f(std::abs(point_diff.x), std::abs(point_diff.y));
-  //}
+  totalWeight = img2_err;
 
   cv::Mat Rotdif;
-  Rotdif = cvRot - cersRot;
+  Rotdif = cvRot - R_final;
 
   Eigen::Vector3d transdiff;
-  Eigen::Vector3d Posi(posi);
+ 
+  double T_final[3],Rot_final[4];
   for (int i = 0; i < 3; i++) {
-    transdiff[i] = Tvec.at<double>(i) - posi[i];
+    transdiff[i] = t_final.at<double>(i) - posi[i];
+    T_final[i] = t_final.at<double>(i);
   }
+  Rot_final[0] = quat_res.w();
+  Rot_final[1] = quat_res.x();
+  Rot_final[2] = quat_res.y();
+  Rot_final[3] = quat_res.z();
+  
+
+   Eigen::Vector3d Posi(T_final);
   /* totalWeight = summary.final_cost;*/
+  cout << "Original trans : ["  << tvec.at<double>(0) << "," << tvec.at<double>(1) << "," << tvec.at<double>(2) << "]"<<endl;
   std::ostringstream oss;
-  oss << "ceres trans : [" << Posi.x() << "," << Posi.y() << "," << Posi.z() << "]";
+  oss << "Corrspondence trans : [" << Posi.x() << "," << Posi.y() << "," << Posi.z() << "]";
   string trans_info = oss.str();
   logger->info(oss.str());
   oss.str("");
   oss.clear();
-  // cout << " ceres trans :" << "\n"<< Posi << "\n";
-  cout << "opencv trans rot:"
-       << "\n"
-       << Tvec << "\n";
-  cout << "Trans diff(cv-ceres):"
-       << "\n"
-       << transdiff << "\n";
-  oss << "ceres Rot : \n" << cersRot;
+  cout << "Original trans : [" << quan.w() << "," << quan.x() << "," << quan.y() << "," << quan.z() << "]" << endl;
+  oss << "Corrspondence Rot : [" << quat_res.w() << "," << quat_res.x() << "," << quat_res.y() << "," << quat_res.z() <<"]";
   logger->info(oss.str());
   oss.str("");
   oss.clear();
-  cout << "opencv Rot:"
-       << "\n"
-       << cvRot << "\n";
-  cout << "Rot diff(cv-ceres): "
+  cout << "Rot diff(corrspond-original): "
        << "\n"
        << Rotdif << "\n ";
   cout << "\n";
@@ -387,32 +459,22 @@ bool create_edge_from_corrspondence_pts(const QinPose& srcPose, const QinPose& t
   cout << "sum of Rot error:"
        << "\n"
        << cv::sum(cv::abs(Rotdif)) << "\n";
-  //cout << "sum of Opencv reproject error: " << cvReprj_diff_sum << "with " << num_measure << " points, the ave error:" << cvReprj_diff_sum / num_measure << endl;
-  /*oss << "sum of Ceres reproject error: [" << cvReprj_diff_sum.x << "," << cvReprj_diff_sum.y << "] with " << num_measure << " points, the ave error: [" << cvReprj_diff_sum.x / num_measure << ","
-      << cvReprj_diff_sum.x / num_measure << "]";
-  logger->info(oss.str());
-  oss.str("");
-  oss.clear();*/
-  oss << "the average ceres residual is [" << totalWeight / num_measure << ']' << '\n';
+  oss << "the average epipolar line error is [" << totalWeight / inlier_num << "], with [" << inlier_num << "] corrspondence points"<< '\n';
   logger->info(oss.str());
   oss.str("");
   oss.clear();
-  // logger->info("sum Ceres reproject error , with  points and the mean value");  //, ceReprj_diff_sum, num_measure, ceReprj_diff_sum / num_measure);
-  // logger->info("sum Opencv reproject error {}, with {} points and the mean value {}", cvReprj_diff_sum, num_measure, cvReprj_diff_sum / num_measure);
+ 
   bool valid = true;
-  double diff_rate = (transdiff.norm()) / (Posi.norm());
+  /*double diff_rate = (transdiff.norm()) / (Posi.norm());
   if (diff_rate > 0.01 && (transdiff.norm()) > 1) {
     valid = false;
     cout << "the result is not stable with the rate of:" << diff_rate << endl;
-  }
-  //if (cvReprj_diff_sum.x / num_measure > 10 || cvReprj_diff_sum.y / num_measure > 10) {
-  //  logger->info("average reprojection error is too big, abandon this edge");
-  //  return false;
-  //}
+  }*/
+ 
 
   cout << "\n\n";
-  std::vector<double> Pose_trans(posi, posi + sizeof(posi) / sizeof(posi[0]));
-  std::vector<double> Pose_rota(Rot, Rot + sizeof(Rot) / sizeof(Rot[0]));
+  std::vector<double> Pose_trans(T_final, T_final + sizeof(T_final) / sizeof(T_final[0]));
+  std::vector<double> Pose_rota(Rot_final, Rot_final + sizeof(Rot_final) / sizeof(Rot_final[0]));
   std::vector<double> Pose;
   Pose.reserve(Pose_trans.size() + Pose_rota.size());
   Pose.insert(Pose.end(), Pose_trans.begin(), Pose_trans.end());
@@ -426,7 +488,7 @@ bool create_edge_from_corrspondence_pts(const QinPose& srcPose, const QinPose& t
     if (std::isnan(xfm[_d]) || std::isinf(xfm[_d])) valid = false;
   }
   for (int _d = 0; _d < 6; ++_d) {
-    cov[7 * _d] = 1. / (totalWeight / num_measure);
+    cov[7 * _d] = 1. / (totalWeight / inlier_num);
   }
   return valid;
 }
@@ -762,3 +824,17 @@ int main(int argc, char** argv) {
   return 0;
 }
 
+bool IsTriangulatedPointInFrontOfCameras(const Eigen::Vector3d& pt1, const Eigen::Vector3d& pt2, const Eigen::Matrix3d& R, const Eigen::Vector3d& t) {
+  const Eigen::Vector3d c = -R.transpose() * t;
+
+  const Eigen::Vector3d dir1 = pt1;
+  const Eigen::Vector3d dir2 = R.transpose() * pt2;
+
+  const double dir1_sq = dir1.squaredNorm();
+  const double dir2_sq = dir2.squaredNorm();
+  const double dir1_dir2 = dir1.dot(dir2);
+  const double dir1_pos = dir1.dot(c);
+  const double dir2_pos = dir2.dot(c);
+
+  return (dir2_sq * dir1_pos - dir1_dir2 * dir2_pos > 0 && dir1_dir2 * dir1_pos - dir1_sq * dir2_pos > 0);
+}
