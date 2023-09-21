@@ -382,19 +382,19 @@ int main(int argc, char** argv) {
       quat_tgt[j] = tgtN.xfm[j];*/
       rot_srctgt[j-3] = e.xfm[j];
     }
-    Eigen::Map < Eigen::Matrix<double, 6, 6>> Cov_weight(e.cov);
-    //Cov_weight = Cov_weight.array().square().matrix();
-    //Eigen::Matrix<double, 6, 6> Cov_weight=Eigen::MatrixXd::Identity(6,6);
+    //Eige/*n::Map < Eigen::Matrix<double, 6, 6>> Cov_weight(e.cov);
+    //Cov_*/weight = Cov_weight / 1000;
+    Eigen::Matrix<double, 6, 6> Cov_weight=Eigen::MatrixXd::Identity(6,6);
     Eigen::Vector3d trans_srctgt_(trans_srctgt);
     Eigen::Quaternion rot_srctgt_(rot_srctgt[0], rot_srctgt[1], rot_srctgt[2], rot_srctgt[3]);
-  //  Eigen::Quaternion Rot = rot_srctgt_ * rot_srctgt_.conjugate();
+   //  Eigen::Quaternion Rot = rot_srctgt_ * rot_srctgt_.conjugate();
     problem.AddResidualBlock(new ceres::AutoDiffCostFunction<PoseGraph3dError, 6 ,3,4,3,4>
         (new PoseGraph3dError(trans_srctgt_, rot_srctgt_,Cov_weight)), nullptr,srcN.xfm ,srcN.xfm+3,tgtN.xfm,tgtN.xfm+3);//,Cov_weight
     problem.AddParameterBlock(srcN.xfm + 3, 4, new ceres::EigenQuaternionParameterization);
     problem.AddParameterBlock(tgtN.xfm + 3, 4, new ceres::EigenQuaternionParameterization);
     if (!flag) {
-      problem.SetParameterBlockConstant(srcN.xfm);
-      problem.SetParameterBlockConstant(srcN.xfm + 3);
+      problem.SetParameterBlockConstant(tgtN.xfm);
+      problem.SetParameterBlockConstant(tgtN.xfm + 3);
       flag = true;
     }
 
